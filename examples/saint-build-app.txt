@@ -1,0 +1,21 @@
+# Saint - build configuration
+#
+# Keep this file in your project and edit it by hand.
+# Pass it to ManifestTool when you publish a release:
+#
+#   java -cp dist/Saint.jar org.hp.update.ManifestTool \
+#        app.txt dist/release 1.0.0 dist/upload
+#
+# You do NOT list jars here. Every file in the release folder is picked up
+# automatically: .jar files go on the classpath, everything else is a resource.
+
+appbase = http://172.104.47.59:8080/apps/accord/
+ui.name = Saint
+class   = org.hp.accord.Main
+
+# Optional. This library set (POI, JasperReports, Batik) is memory hungry.
+jvmarg  = -Xmx1024m
+
+# Other optional lines:
+# apparg         = --some-flag     argument passed to your app, repeat for more
+# keep-versions  = 2               old versions kept on the client for rollback

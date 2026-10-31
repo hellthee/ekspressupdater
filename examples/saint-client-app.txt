@@ -1,0 +1,18 @@
+# Saint - client configuration
+#
+# Save this as app.txt in the application folder on the user's PC, e.g.
+#
+#   C:\Apps\Saint\app.txt
+#
+# and start it with:
+#
+#   javaw -jar launcher.jar C:\Apps\Saint
+#
+# Everything else (current, previous, versions\, cache\) is created and
+# maintained by the launcher. Nothing else needs to be installed.
+
+appbase = http://172.104.47.59:8080/apps/accord/
+ui.name = Saint
+
+# Optional:
+# check-on-start = false   start without looking for updates
