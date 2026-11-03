@@ -259,3 +259,30 @@ Run with `java` instead of `javaw` to see what happens. Every line starts with `
    they are.
 5. `launcher.jar` does not update itself, by design. Keep it as it is; it only needs
    `org.hp.update`.
+
+## Moving a release to another address
+
+Give every PC a new address without touching them: put a `moved` line into `app.txt` at the
+**old** address.
+
+```
+moved = http://172.104.47.59:8080/apps/gas-x/mainapp/
+```
+
+At its next start each PC reads the old `app.txt`, checks that a usable release answers at the
+new address, and only then changes `appbase` in its own `app.txt` for good. A wrong address
+changes nothing: the PC stays where it was and starts as usual. A set moves the same way: a
+`moved` line in the set's old `app.txt` changes `appbase` in `setapp.txt`; nothing is
+downloaded again and `lib/set.jar` stays in use.
+
+Two ways to write the old `app.txt`:
+
+| Old `app.txt` | PCs with an updater from before `moved` existed | PCs with a newer updater |
+|---|---|---|
+| Only the `moved = …` line | cannot read it: they start the version they have and stay there | move |
+| The full release, plus a `moved = …` line under `class` | update as usual (the line is ignored) | move |
+
+So, while older PCs are still around: publish the latest release (with the new
+`EkspressUpdater` jar) at the **new** address, copy the same `app.txt` and `files/` to the
+**old** one, and add the `moved` line there. Once every PC has started once, the old folder can
+go. A Saint company's `set_url` in the database should be changed to the new address too.

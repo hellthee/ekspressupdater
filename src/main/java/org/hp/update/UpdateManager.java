@@ -138,18 +138,99 @@ public final class UpdateManager {
      */
     public UpdateManifest fetchRemoteManifest(int attempts) throws IOException {
         listener.onPhase("CHECKING");
-        listener.onLog("Fetching " + cfg.manifestUrl());
-        byte[] raw = downloader.fetch(cfg.manifestUrl(), cancel, attempts,
-                cfg.checkConnectTimeoutMs(), cfg.checkReadTimeoutMs());
-        return parseRelease(new String(raw, Io.UTF8));
+        return release(fetchManifest(cfg.manifestUrl(), attempts), attempts, 0);
     }
 
     /** As above, with the normal retry policy. */
     public UpdateManifest fetchRemoteManifest() throws IOException {
         listener.onPhase("CHECKING");
-        listener.onLog("Fetching " + cfg.manifestUrl());
-        byte[] raw = downloader.fetch(cfg.manifestUrl(), cancel);
-        return parseRelease(new String(raw, Io.UTF8));
+        return release(fetchManifest(cfg.manifestUrl(), -1), -1, 0);
+    }
+
+    private String fetchManifest(String url, int attempts) throws IOException {
+        listener.onLog("Fetching " + url);
+        byte[] raw = attempts < 0 ? downloader.fetch(url, cancel)
+                : downloader.fetch(url, cancel, attempts, cfg.checkConnectTimeoutMs(),
+                        cfg.checkReadTimeoutMs());
+        return new String(raw, Io.UTF8);
+    }
+
+    /** Persists a new address when the server says the release has moved. */
+    interface MoveListener {
+        void moved(String from, String to) throws IOException;
+    }
+
+    private MoveListener moveListener;
+
+    /** Who records a move; without one, the application's own app.txt is changed. */
+    UpdateManager onMoved(MoveListener l) {
+        this.moveListener = l;
+        return this;
+    }
+
+    /**
+     * The release in {@code text}, or, when it says {@code moved = <address>}, the release at
+     * that address. The PC switches only once a usable release was found there; then its
+     * app.txt (or setapp.txt) is changed for good. A wrong address leaves it where it is.
+     */
+    private UpdateManifest release(String text, int attempts, int hops) throws IOException {
+        String to = movedTo(text);
+        if (to == null) {
+            return parseRelease(text);
+        }
+        String from = cfg.baseUrl();
+        String target = to.endsWith("/") ? to : to + "/";
+        if (hops >= 3) {
+            throw new IOException("the release has moved more than 3 times; stopped at " + from);
+        }
+        if (!(target.startsWith("http://") || target.startsWith("https://"))
+                || PluginSet.sameAddress(from, target)) {
+            throw new IOException(UpdateConfig.APP_TXT + " at " + from + " says moved = " + to
+                    + ", which is not a usable address");
+        }
+        listener.onLog("The release has moved to " + target);
+        UpdateManifest m;
+        cfg.setBaseUrl(target);
+        try {
+            m = release(fetchManifest(cfg.manifestUrl(), attempts), attempts, hops + 1);
+        } catch (IOException e) {
+            cfg.setBaseUrl(from);
+            throw new IOException("the release has moved to " + target + ", but nothing usable was"
+                    + " found there (" + e.getMessage() + "); this PC stays with " + from, e);
+        }
+        if (hops == 0) {
+            try {
+                if (moveListener != null) {
+                    moveListener.moved(from, cfg.baseUrl());
+                } else if (pluginName == null) {
+                    UpdateConfig.writeAppBase(cfg.appDir().resolve(UpdateConfig.APP_TXT), cfg.baseUrl());
+                }
+                listener.onLog("Address changed for good: " + from + " -> " + cfg.baseUrl());
+            } catch (IOException e) {
+                // Used for this start anyway; the next start follows the move again.
+                listener.onWarning("could not record the new address: " + e.getMessage());
+            }
+        }
+        return m;
+    }
+
+    /** The address of a "moved = ..." line, or null. */
+    static String movedTo(String text) {
+        if (text == null) {
+            return null;
+        }
+        for (String raw : text.split("\n")) {
+            String s = raw.trim();
+            if (s.startsWith("\uFEFF")) {
+                s = s.substring(1);
+            }
+            int eq = s.indexOf('=');
+            if (!s.startsWith("#") && eq > 0 && "moved".equalsIgnoreCase(s.substring(0, eq).trim())) {
+                String v = s.substring(eq + 1).trim();
+                return v.isEmpty() ? null : v;
+            }
+        }
+        return null;
     }
 
     private UpdateManifest parseRelease(String text) throws IOException {
