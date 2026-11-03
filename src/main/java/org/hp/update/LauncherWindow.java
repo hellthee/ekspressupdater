@@ -48,6 +48,7 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
         title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 4f));
         detailScroll.setVisible(false);
         retryButton.setVisible(false);
+        repairButton.setVisible(false);
         skipButton.setVisible(false);
         copyButton.setVisible(false);
         logButton.setVisible(false);
@@ -83,6 +84,8 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
         filler5 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
         logButton = new javax.swing.JButton();
         filler6 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        repairButton = new javax.swing.JButton();
+        filler8 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
         retryButton = new javax.swing.JButton();
         filler7 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
         closeButton = new javax.swing.JButton();
@@ -157,6 +160,13 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
 
         buttons.add(filler6);
 
+        repairButton.setText("Repair");
+        repairButton.setToolTipText("Checks every file and downloads again what is damaged or missing");
+        repairButton.addActionListener(this::repairButtonActionPerformed);
+        buttons.add(repairButton);
+
+        buttons.add(filler8);
+
         retryButton.setText("Retry");
         retryButton.addActionListener(this::retryButtonActionPerformed);
         buttons.add(retryButton);
@@ -196,6 +206,10 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
             // not every desktop can open a folder for us
         }
     }//GEN-LAST:event_logButtonActionPerformed
+
+    private void repairButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_repairButtonActionPerformed
+        answer(true);
+    }//GEN-LAST:event_repairButtonActionPerformed
 
     private void retryButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_retryButtonActionPerformed
         answer(true);
@@ -452,13 +466,29 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
 
     @Override
     public boolean askRetry(String headline, String body) {
+        return ask(retryButton, headline, body, null, "Trying again...", "== Retrying");
+    }
+
+    @Override
+    public boolean askRepair(String headline, String body) {
+        return ask(repairButton, headline, body,
+                "Click Repair to check every file and download again what is damaged or missing.",
+                "Repairing...", "== Repairing");
+    }
+
+    /** Shows the problem with one extra button; true when the user clicks it. */
+    private boolean ask(final javax.swing.JButton button, String headline, String body,
+            final String hint, final String againText, String logLine) {
         asking = true;
         failed(headline, body);
         onEdt(new Runnable() {
             @Override
             public void run() {
-                retryButton.setVisible(true);
-                retryButton.requestFocusInWindow();
+                if (hint != null) {
+                    stage.setText(hint);
+                }
+                button.setVisible(true);
+                button.requestFocusInWindow();
                 validate();
             }
         });
@@ -478,17 +508,17 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
                     setTitle(cfg.displayName());
                     title.setForeground(UIManagerColor.label());
                     title.setText(cfg.displayName());
-                    stage.setText("Trying again...");
+                    stage.setText(againText);
                     bar.setIndeterminate(true);
                     bar.setString(" ");
-                    retryButton.setVisible(false);
+                    button.setVisible(false);
                     copyButton.setVisible(false);
                     logButton.setVisible(false);
                     validate();
                 }
             });
             detail("");
-            detail("== Retrying");
+            detail(logLine);
         }
         return again;
     }
@@ -550,7 +580,9 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
     private javax.swing.Box.Filler filler5;
     private javax.swing.Box.Filler filler6;
     private javax.swing.Box.Filler filler7;
+    private javax.swing.Box.Filler filler8;
     private javax.swing.JButton logButton;
+    private javax.swing.JButton repairButton;
     private javax.swing.JButton retryButton;
     private javax.swing.JButton skipButton;
     private javax.swing.JLabel stage;

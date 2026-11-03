@@ -275,8 +275,30 @@ public final class Bootstrap {
             }
             ui.detail(String.valueOf(mgr.repair()));
         }
-        return launch(cfg, store, ui, gui, appArgs);
+        while (true) {
+            int code = launch(cfg, store, ui, gui, appArgs);
+            if (code != REPAIR) {
+                return code;
+            }
+            // Repair clicked in the window: every file checked by its checksum, what is
+            // damaged or missing downloaded again (the set too), then started again.
+            java.io.Closeable lock = waitForLock(store, ui, cfg);
+            try {
+                store.clearFailed();
+                ui.stage("Repairing installation");
+                for (String restored : store.restoreMissingSettings()) {
+                    ui.detail("Restored default " + restored);
+                }
+                ui.detail(String.valueOf(mgr.repair()));
+                updatePlugins(cfg, ui);
+            } finally {
+                Io.closeQuietly(lock);
+            }
+        }
     }
+
+    /** What launch() returns when the user clicked Repair: repair, then start again. */
+    private static final int REPAIR = Integer.MIN_VALUE;
 
     private enum Outcome { READY, RETRY, STOP }
 
@@ -557,7 +579,9 @@ public final class Bootstrap {
         log("startup failure in " + version + ": " + message.replace("\n", " "));
 
         if (!store.hasUnconfirmedUpdate()) {
-            ui.failed(cfg.displayName() + " could not start", message);
+            if (ui.askRepair(cfg.displayName() + " could not start", message)) {
+                return REPAIR;
+            }
             ui.awaitClose();
             return exit == 0 ? 3 : exit;
         }
@@ -584,8 +608,10 @@ public final class Bootstrap {
             return exit == 0 ? 3 : exit;
         }
         if (back == null) {
-            ui.failed(cfg.displayName() + " could not start", message
-                    + "\n\nThere is no earlier version on this computer to go back to.");
+            if (ui.askRepair(cfg.displayName() + " could not start", message
+                    + "\n\nThere is no earlier version on this computer to go back to.")) {
+                return REPAIR;
+            }
             ui.awaitClose();
             return exit == 0 ? 3 : exit;
         }
@@ -595,8 +621,10 @@ public final class Bootstrap {
 
         String stillBroken = Relauncher.startupProblem(cfg);
         if (stillBroken != null) {
-            ui.failed(cfg.displayName() + " could not start", message
-                    + "\n\nGoing back to version " + back + " did not help either:\n" + stillBroken);
+            if (ui.askRepair(cfg.displayName() + " could not start", message
+                    + "\n\nGoing back to version " + back + " did not help either:\n" + stillBroken)) {
+                return REPAIR;
+            }
             ui.awaitClose();
             return 3;
         }
@@ -620,9 +648,11 @@ public final class Bootstrap {
         pump2.join(2000);
 
         if (!pump2.sawStarted() && pump2.sawStartupFailure()) {
-            ui.failed(cfg.displayName() + " could not start",
+            if (ui.askRepair(cfg.displayName() + " could not start",
                     "Version " + version + " failed, and so did the previous version " + back
-                    + ".\n\nThe output above is from the Java runtime.");
+                    + ".\n\nThe output above is from the Java runtime.")) {
+                return REPAIR;
+            }
             ui.awaitClose();
             return secondExit;
         }
