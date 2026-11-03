@@ -212,6 +212,7 @@ public final class PluginUpdate {
         UpdateManifest release;
         try {
             UpdateManifest remote = mgr.fetchRemoteManifest(mgr.config().checkAttempts());
+            address = mgr.config().baseUrl(); // the new one, if the set has moved
             UpdateManager.Result r = p.install(mgr, remote, owner);
             if (r.status != UpdateManager.Status.UPDATED && r.status != UpdateManager.Status.UP_TO_DATE) {
                 throw new IOException(r.status == UpdateManager.Status.CANCELLED

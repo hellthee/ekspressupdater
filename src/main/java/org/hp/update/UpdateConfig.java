@@ -320,6 +320,39 @@ public final class UpdateConfig {
         return baseUrl + manifestName;
     }
 
+    /** Where the release description would be if the release lived at {@code base}. */
+    String manifestUrlAt(String base) {
+        return (base.endsWith("/") ? base : base + "/") + manifestName;
+    }
+
+    /**
+     * Changes only the {@code appbase} line of an app.txt or setapp.txt on this PC (the
+     * release has moved); every other line stays as it is.
+     */
+    static void writeAppBase(Path file, String url) throws IOException {
+        String text = Io.readString(file);
+        StringBuilder sb = new StringBuilder();
+        boolean done = false;
+        if (text != null) {
+            for (String raw : text.split("\n", -1)) {
+                String t = raw.trim();
+                String key = !t.startsWith("#") && t.indexOf('=') > 0
+                        ? t.substring(0, t.indexOf('=')).trim().toLowerCase() : "";
+                if ("appbase".equals(key) && !done) {
+                    sb.append("appbase = ").append(url).append('\n');
+                    done = true;
+                } else if (!"appbase".equals(key)) {
+                    sb.append(raw).append('\n');
+                }
+            }
+        }
+        String out = done ? sb.toString() : "appbase = " + url + "\n" + sb;
+        while (out.endsWith("\n\n")) {
+            out = out.substring(0, out.length() - 1);
+        }
+        Io.writeStringAtomic(file, out);
+    }
+
     public String blobUrl(String sha256) {
         return baseUrl + blobPath + sha256.substring(0, 2) + "/" + sha256;
     }

@@ -670,7 +670,31 @@ final class PluginSet {
         if (app != null) {
             cfg.copyTuningFrom(app);
         }
-        return new UpdateManager(cfg, log).forPlugin(name);
+        return new UpdateManager(cfg, log).forPlugin(name).onMoved(new UpdateManager.MoveListener() {
+            @Override
+            public void moved(String from, String to) throws IOException {
+                PluginSet.this.moved(from, to);
+            }
+        });
+    }
+
+    /**
+     * The set's release has moved on the server (moved = ...): setapp.txt and the record of
+     * where the downloaded and the in-place set came from follow it, so nothing is
+     * downloaded again and lib/set.jar stays on the class path.
+     */
+    void moved(String from, String to) throws IOException {
+        if (sameAddress(address(), from)) {
+            UpdateConfig.writeAppBase(configFile(), to);
+        }
+        Properties p = state();
+        for (String key : new String[] {"storeAddress", "activeAddress"}) {
+            String v = p.getProperty(key);
+            if (v != null && sameAddress(v, from)) {
+                p.setProperty(key, to);
+            }
+        }
+        saveState(p);
     }
 
     /**
