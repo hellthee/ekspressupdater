@@ -16,15 +16,17 @@ import java.util.Set;
  * <pre>
  * C:\Saint\setapp.txt              where the set comes from, and its version (like app.txt)
  * C:\Saint\lib\set.jar             the set in use: on the class path, so Class.forName works
- * C:\Saint\plugins\set\set.jar     the last downloaded and verified release (the source)
- * C:\Saint\plugins\set\.update\    its record and download cache
+ * C:\Saint\.update\plugins\set\.update\installed.txt   the release: every file, size, SHA-256
  * C:\Saint\.update\plugin-set.properties   what is in lib, from where; failed attempts
  * </pre>
  *
- * <p>New releases are downloaded into {@code plugins\set} at any time; copying them to
- * {@code lib} ("putting them in place") happens only while the application is closed,
+ * <p>A new release is downloaded into {@code .update\plugins\set} at any time; copying it to
+ * {@code lib} ("putting it in place") happens only while the application is closed,
  * because a jar the application has open cannot be replaced (Windows) or would not be
- * re-read (everywhere else).</p>
+ * re-read (everywhere else). Once it is in place the downloaded copy is deleted and only
+ * the release's list is kept, as for the application itself: a damaged or replaced file is
+ * downloaded again. (Older updaters kept a full copy in {@code plugins\set}; it is moved
+ * and trimmed at the next start.)</p>
  */
 final class PluginSet {
 
@@ -99,14 +101,16 @@ final class PluginSet {
         return out;
     }
 
-    /** Plugins with a setapp.txt, a download in plugins/, or a record of files in place. */
+    /** Plugins with a setapp.txt, a download (or its record), or a record of files in place. */
     private static List<PluginSet> known(Path appDir) {
         Set<String> names = new LinkedHashSet<String>();
-        java.io.File[] dirs = appDir.resolve("plugins").toFile().listFiles();
-        if (dirs != null) {
-            for (java.io.File d : dirs) {
-                if (d.isDirectory()) {
-                    names.add(d.getName());
+        for (Path base : new Path[] {storesDir(appDir), appDir.resolve(LEGACY_STORES)}) {
+            java.io.File[] dirs = base.toFile().listFiles();
+            if (dirs != null) {
+                for (java.io.File d : dirs) {
+                    if (d.isDirectory()) {
+                        names.add(d.getName());
+                    }
                 }
             }
         }
@@ -141,8 +145,72 @@ final class PluginSet {
         return appDir.resolve(name + CONFIG_SUFFIX);
     }
 
+    /** Where older updaters kept each plugin's download, next to the application. */
+    private static final String LEGACY_STORES = "plugins";
+
+    private static Path storesDir(Path appDir) {
+        return appDir.resolve(InstallStore.UPDATE_DIR).resolve("plugins");
+    }
+
+    /** The plugin's download and record: in .update, or where an older updater left it. */
     Path storeDir() {
-        return appDir.resolve("plugins").resolve(name);
+        Path dir = storesDir(appDir).resolve(name);
+        Path legacy = appDir.resolve(LEGACY_STORES).resolve(name);
+        return !Files.exists(dir) && Files.isDirectory(legacy) ? legacy : dir;
+    }
+
+    /**
+     * Moves an older updater's plugins\NAME into .update\plugins\NAME, and removes the
+     * plugins folder once nothing is left in it. Call it while holding the update lock.
+     */
+    void moveLegacyStore() {
+        Path legacy = appDir.resolve(LEGACY_STORES).resolve(name);
+        if (!Files.isDirectory(legacy)) {
+            return;
+        }
+        Path dir = storesDir(appDir).resolve(name);
+        try {
+            if (Files.exists(dir)) {
+                Io.deleteQuietly(legacy); // both: the one in .update is the newer
+            } else {
+                Files.createDirectories(dir.getParent());
+                Files.move(legacy, dir);
+            }
+        } catch (IOException e) {
+            return; // in use: the next start tries again, the old place still works
+        }
+        java.io.File[] left = appDir.resolve(LEGACY_STORES).toFile().listFiles();
+        if (left != null && left.length == 0) {
+            Io.deleteQuietly(appDir.resolve(LEGACY_STORES));
+        }
+    }
+
+    /**
+     * Once the release is in place, deletes the downloaded copy of its files and keeps only
+     * its list (installed.txt): no second copy of the set stays on the PC.
+     */
+    void trimStore() {
+        if (!inPlace()) {
+            return;
+        }
+        Path dir = storeDir();
+        java.io.File[] top = dir.toFile().listFiles();
+        if (top == null) {
+            return;
+        }
+        for (java.io.File f : top) {
+            if (!f.getName().equals(InstallStore.UPDATE_DIR)) {
+                Io.deleteQuietly(f.toPath());
+            }
+        }
+        java.io.File[] record = dir.resolve(InstallStore.UPDATE_DIR).toFile().listFiles();
+        if (record != null) {
+            for (java.io.File f : record) {
+                if (!f.getName().equals(InstallStore.INSTALLED)) {
+                    Io.deleteQuietly(f.toPath());
+                }
+            }
+        }
     }
 
     InstallStore store() {
@@ -329,7 +397,7 @@ final class PluginSet {
         Io.storeProps(stateFile(), p);
     }
 
-    /** The address the download in plugins\NAME came from, or null. */
+    /** The address the download in .update\plugins\NAME came from, or null. */
     String storeAddress() {
         return stateValue("storeAddress");
     }
@@ -531,6 +599,7 @@ final class PluginSet {
         p.setProperty("activeVersion", m.version());
         recordShas(p, m, dir);
         saveState(p);
+        trimStore();
         return name + " " + m.version() + " put in place (" + now + ")";
     }
 
@@ -567,13 +636,14 @@ final class PluginSet {
         } catch (IOException ignored) {
             // advisory
         }
+        trimStore();
     }
 
     // ------------------------------------------------------------------ downloading
 
     /**
      * Looks for a newer release at the address in setapp.txt and downloads it into
-     * plugins\NAME (not into lib). Short timeouts: this runs while the user waits for the
+     * .update\plugins\NAME (not into lib). Short timeouts: this runs while the user waits for the
      * application to open.
      *
      * @return the release on the server, or null when it could not be checked
@@ -604,17 +674,19 @@ final class PluginSet {
     }
 
     /**
-     * Downloads {@code remote} into plugins\NAME unless it is already there, complete.
-     * A download for another address, or a damaged one, is never mixed with this one: the
-     * folder starts over.
+     * Downloads {@code remote} into .update\plugins\NAME unless it is already there, or
+     * already in place. A download for another address, or a damaged one, is never mixed
+     * with this one: the folder starts over.
      */
     UpdateManager.Result install(UpdateManager mgr, UpdateManifest remote, java.awt.Window owner)
             throws IOException {
         String address = mgr.config().baseUrl();
         UpdateManifest have = store().installed();
-        if (have != null && (!sameAddress(storeAddress(), address) || !storeIntact()
+        // Usable: complete in the download folder, or already in place (its copy trimmed).
+        boolean usable = have != null && (storeIntact() || inPlace());
+        if (have != null && (!sameAddress(storeAddress(), address) || !usable
                 || have.version().equals(remote.version()) && !sameFiles(have, remote))) {
-            if (sameFiles(have, remote) && storeIntact()) {
+            if (sameFiles(have, remote) && usable) {
                 setState("storeAddress", address); // the same files under another address
             } else {
                 Io.deleteQuietly(storeDir());
@@ -629,6 +701,7 @@ final class PluginSet {
                     "Already downloaded", null);
         }
         Files.createDirectories(storeDir());
+        copyUnchangedFromPlace(remote);
         UpdateManager.Result r;
         if (owner != null && !java.awt.GraphicsEnvironment.isHeadless()) {
             String title = (remote.uiName() != null ? remote.uiName() : name) + " " + remote.version();
@@ -637,10 +710,32 @@ final class PluginSet {
             r = mgr.install(remote);
         }
         if (r.status == UpdateManager.Status.UPDATED) {
-            mgr.store().confirmUpdate(); // the copy in plugins\ is never run from
+            mgr.store().confirmUpdate(); // the downloaded copy is never run from
             setState("storeAddress", address);
         }
         return r;
+    }
+
+    /**
+     * Files of the new release that are already in place, byte for byte, are copied into the
+     * download folder instead of being downloaded again (the copy there was trimmed).
+     */
+    private void copyUnchangedFromPlace(UpdateManifest remote) {
+        String dir = targetDir(remote);
+        InstallStore s = store();
+        for (UpdateManifest.FileEntry e : remote.entries().values()) {
+            try {
+                Path placed = target(e, dir);
+                if (s.hasIntact(e) || !Io.matches(placed, e.size, e.sha256)) {
+                    continue;
+                }
+                Path copy = s.file(e.path);
+                Io.ensureParent(copy);
+                Files.copy(placed, copy, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException | IllegalArgumentException ignored) {
+                // downloaded instead
+            }
+        }
     }
 
     private static boolean sameFiles(UpdateManifest a, UpdateManifest b) {
