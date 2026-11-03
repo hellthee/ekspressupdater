@@ -296,6 +296,7 @@ public final class Bootstrap {
         };
         for (PluginSet p : PluginSet.all(cfg.appDir())) {
             try {
+                p.moveLegacyStore();
                 if (cfg.checkOnStart()) {
                     p.refresh(cfg, toUi);
                 }
@@ -308,6 +309,7 @@ public final class Bootstrap {
                         updated.append(updated.length() == 0 ? "" : ",").append(p.name);
                     }
                 }
+                p.trimStore(); // only when it is in place: then its downloaded copy goes
             } catch (Exception e) {
                 ui.detail("The " + p.name + " could not be updated: " + e.getMessage());
                 log("plugin " + p.name + ": " + e.getMessage());
