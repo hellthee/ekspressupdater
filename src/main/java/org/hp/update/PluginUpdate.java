@@ -225,7 +225,8 @@ public final class PluginUpdate {
             // Offline (or the download failed): what was downloaded before for this address
             // can still be put in place.
             UpdateManifest have = p.store().installed();
-            if (have != null && p.storeIntact() && PluginSet.sameAddress(address, p.storeAddress())) {
+            if (have != null && (p.storeIntact() || p.inPlace())
+                    && PluginSet.sameAddress(address, p.storeAddress())) {
                 log("using the " + name + " " + have.version() + " downloaded earlier: " + e.getMessage());
                 release = have;
             } else {

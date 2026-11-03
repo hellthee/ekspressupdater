@@ -25,7 +25,8 @@ PC  C:\Saint\
   app.txt          Saint's address
   setapp.txt       plugin = set / appbase = …/sets/pt-abc/ / version = 1.0.3
   lib\set.jar      PT ABC's set, on the class path
-  plugins\set\     the last downloaded set (the source lib\set.jar is copied from)
+  .update\plugins\set\.update\installed.txt   the set's file list (size + SHA-256); a
+                   downloaded copy stays there only until it is put in place
 ```
 
 ---
@@ -197,8 +198,8 @@ new one is never forgotten. Only `launcher.exe` and `launcher.jar` stay out.
 | Normal start, set current | Nothing extra (one small check of the server at startup) |
 | `setapp.txt` missing or damaged, `lib\set.jar` correct | At login: DB asked once, `setapp.txt` written again. No download, no restart |
 | `setapp.txt` missing, set missing or wrong (first install) | At login: DB asked, set downloaded, `installed(version)`, notice, **one restart** |
-| `lib\set.jar` deleted | Put back at startup from `plugins\set`. No DB |
-| `plugins\set` damaged | Downloaded again at startup |
+| `lib\set.jar` deleted, damaged or replaced by hand | Downloaded again at startup (only the files that differ) and put back. No DB |
+| PC set up by an older updater (`plugins\set\` full copy) | Moved into `.update\plugins\set` at the next start and trimmed to its file list; `plugins\` is removed. Nothing downloaded |
 | Server unreachable | The set in place is used |
 | Server unreachable on a PC that never had the set | `ensure` throws: *"…has not been downloaded to this PC yet… check the internet connection"* |
 | `lib\set.jar` in use by another Saint (Windows) | That start carries on with the current set and says why. The new set goes in at the next start, without downloading again |
