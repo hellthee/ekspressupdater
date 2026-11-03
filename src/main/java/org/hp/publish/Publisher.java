@@ -90,6 +90,7 @@ public final class Publisher extends JFrame {
     public Publisher() {
         initComponents();
 
+        split.setBorder(null); // here, not in the form: NetBeans drops a "no border" setting
         versionField.setMaximumSize(new Dimension(120, versionField.getPreferredSize().height));
         setVersionField.setMaximumSize(new Dimension(120, setVersionField.getPreferredSize().height));
         configureTable(appTable);
@@ -220,7 +221,6 @@ public final class Publisher extends JFrame {
         setTitle("Release publisher");
         setPreferredSize(new java.awt.Dimension(900, 760));
         getContentPane().setLayout(new java.awt.BorderLayout());
-        split.setBorder(null);
         split.setOrientation(javax.swing.JSplitPane.VERTICAL_SPLIT);
         split.setResizeWeight(0.8);
         appPanel.setLayout(new java.awt.BorderLayout());

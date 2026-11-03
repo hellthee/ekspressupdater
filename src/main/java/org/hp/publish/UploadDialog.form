@@ -241,7 +241,7 @@
               <Properties>
                 <Property name="text" type="java.lang.String" value="  only if the key has one"/>
                 <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-                  <Color blue="128" green="128" red="128" type="rgb"/>
+                  <Color blue="80" green="80" red="80" type="rgb"/>
                 </Property>
               </Properties>
               <Constraints>
@@ -381,7 +381,7 @@
           <Properties>
             <Property name="text" type="java.lang.String" value=" "/>
             <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-              <Color blue="0" green="48" red="176" type="rgb"/>
+              <Color blue="0" green="30" red="b0" type="rgb"/>
             </Property>
           </Properties>
           <Constraints>

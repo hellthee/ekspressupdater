@@ -29,9 +29,6 @@
   <SubComponents>
     <Container class="javax.swing.JSplitPane" name="split">
       <Properties>
-        <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
-          <Border info="null"/>
-        </Property>
         <Property name="orientation" type="int" value="0"/>
         <Property name="resizeWeight" type="double" value="0.8"/>
       </Properties>
@@ -223,7 +220,7 @@
                           <Properties>
                             <Property name="text" type="java.lang.String" value=" "/>
                             <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-                              <Color blue="85" green="85" red="85" type="rgb"/>
+                              <Color blue="55" green="55" red="55" type="rgb"/>
                             </Property>
                           </Properties>
                         </Component>
@@ -524,7 +521,7 @@
                           <Properties>
                             <Property name="text" type="java.lang.String" value=" "/>
                             <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-                              <Color blue="85" green="85" red="85" type="rgb"/>
+                              <Color blue="55" green="55" red="55" type="rgb"/>
                             </Property>
                           </Properties>
                         </Component>

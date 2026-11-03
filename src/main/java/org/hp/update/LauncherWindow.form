@@ -71,7 +71,7 @@
             <Property name="text" type="java.lang.String" value="Please wait..."/>
             <Property name="alignmentX" type="float" value="0.0"/>
             <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-              <Color blue="68" green="68" red="68" type="rgb"/>
+              <Color blue="44" green="44" red="44" type="rgb"/>
             </Property>
           </Properties>
         </Component>
