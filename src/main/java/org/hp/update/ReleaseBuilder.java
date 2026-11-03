@@ -21,8 +21,15 @@ public final class ReleaseBuilder {
     /** Build junk that is never part of a release. */
     private static final String[] ALWAYS_SKIP = {
         ".ds_store", "thumbs.db", "desktop.ini", "readme.txt", "getdown.txt",
-        "app.txt", "digest.txt", "digest2.txt"
+        "app.txt", "digest.txt", "digest2.txt", "set.txt"
     };
+
+    /**
+     * Marks a client folder: a folder holding one client's set, laid out like the
+     * application folder (lib/Set.jar, Forms/..., kop.png). The publisher's Set tab keeps
+     * the set's settings in it; the application release never includes such a folder.
+     */
+    public static final String CLIENT_FOLDER_FILE = "set.txt";
 
     /** Extensions that usually mean "settings the application writes while running". */
     private static final String[] SETTINGS_EXTENSIONS = {
@@ -53,13 +60,17 @@ public final class ReleaseBuilder {
         public final boolean classpath;  // a jar, so it belongs on the classpath
         public final boolean skipByDefault;
         public final String note;        // why it is worth a second look, or null
+        /** The client folder (relative) this file is in, or null. */
+        public final String clientFolder;
 
-        Candidate(String path, long size, boolean classpath, boolean skipByDefault, String note) {
+        Candidate(String path, long size, boolean classpath, boolean skipByDefault, String note,
+                String clientFolder) {
             this.path = path;
             this.size = size;
             this.classpath = classpath;
             this.skipByDefault = skipByDefault;
             this.note = note;
+            this.clientFolder = clientFolder;
         }
     }
 
@@ -72,6 +83,15 @@ public final class ReleaseBuilder {
     public static List<Candidate> scan(Path buildDir) throws IOException {
         List<Path> files = Io.listFilesRecursively(buildDir);
         Collections.sort(files);
+        // Client folders below the build folder (not the build folder itself): each holds
+        // one client's set and is published from the Set tab, never with the application.
+        List<String> clientFolders = new ArrayList<String>();
+        for (Path f : files) {
+            String rel = Io.relative(buildDir, f);
+            if (f.getFileName().toString().equalsIgnoreCase(CLIENT_FOLDER_FILE) && rel.indexOf('/') > 0) {
+                clientFolders.add(rel.substring(0, rel.lastIndexOf('/')));
+            }
+        }
         List<Candidate> out = new ArrayList<Candidate>();
         for (Path f : files) {
             String rel = Io.relative(buildDir, f);
@@ -94,12 +114,22 @@ public final class ReleaseBuilder {
                 skip = true;
                 note = "temporary file";
             }
-            if (!skip && lower.endsWith(".exe")) {
+            // Other .exe files (GasX.exe) are published like any file, so a new one is never
+            // forgotten; only the launcher stays out: it is needed before anything is installed.
+            if (!skip && (name.equals("launcher.exe") || name.equals("launcher.jar"))) {
                 skip = true;
-                note = "launcher executable - keep it next to launcher.jar, not in the release";
+                note = "launcher - stays next to the application, not in the release";
+            }
+            String client = null;
+            for (String c : clientFolders) {
+                if (rel.startsWith(c + "/")) {
+                    client = c;
+                    skip = true;
+                    note = "client folder " + c + " (Set tab)";
+                }
             }
 
-            out.add(new Candidate(rel, Files.size(f), lower.endsWith(".jar"), skip, note));
+            out.add(new Candidate(rel, Files.size(f), lower.endsWith(".jar"), skip, note, client));
         }
         return out;
     }

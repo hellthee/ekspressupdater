@@ -14,7 +14,8 @@ import java.nio.file.Paths;
  *
  * <p>You do not list jars anywhere. Every file in the build folder is included: {@code .jar}
  * files as classpath entries, everything else as plain files. Build junk (.DS_Store,
- * README.TXT, getdown.txt, *.exe) is skipped, and so is anything listed as
+ * README.TXT, getdown.txt, launcher.jar / launcher.exe, client folders holding a set.txt)
+ * is skipped, and so is anything listed as
  * {@code # exclude = ...} in your {@code app.txt}.</p>
  */
 public final class ManifestTool {

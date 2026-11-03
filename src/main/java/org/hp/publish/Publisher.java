@@ -10,8 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import javax.swing.Box;
@@ -61,19 +63,25 @@ public final class Publisher extends JFrame {
     /** The plugin name sets are published under: setapp.txt, PluginUpdate.ensure("set", ...). */
     static final String SET_NAME = "set";
 
-    static final int NONE = 0;
     static final int APP = 1;
     static final int SET = 2;
 
-    private final Files2 files = new Files2();
-    private final FileTableModel appModel = new FileTableModel(files, APP);
-    private final FileTableModel setModel = new FileTableModel(files, SET);
+    /** The application's files: the build folder without its client folders. */
+    private final Files2 appFiles = new Files2(APP);
+    /** The set's files: everything in the client folder. */
+    private final Files2 setFiles = new Files2(SET);
+    private final FileTableModel appModel = new FileTableModel(appFiles);
+    private final FileTableModel setModel = new FileTableModel(setFiles);
     /** Shown in Options... (not part of the window). */
     private final JCheckBox clientFilesBox = new JCheckBox("Also create a client folder", true);
     private final JCheckBox oldLayoutBox = new JCheckBox("Copies for older updaters", false);
 
     /** The build folder the fields belong to. */
     private Path lastBuildDir;
+    /** Everything in the build folder, client folders included, as last scanned. */
+    private List<ReleaseBuilder.Candidate> appScan = new ArrayList<ReleaseBuilder.Candidate>();
+    /** The client folder of the Set tab, or null. */
+    private Path setDir;
     /** Application output folder (from the project's app.txt, or project\\upload). */
     private Path appOutDir;
     /** The client the set's version was last suggested for. */
@@ -109,12 +117,14 @@ public final class Publisher extends JFrame {
                 refreshFooter();
             }
         });
-        files.addListener(new Runnable() {
+        Runnable footer = new Runnable() {
             @Override
             public void run() {
                 refreshFooter();
             }
-        });
+        };
+        appFiles.addListener(footer);
+        setFiles.addListener(footer);
 
         loadPrefs();
         pack();
@@ -165,8 +175,9 @@ public final class Publisher extends JFrame {
         appTable = new javax.swing.JTable(appModel);
         setPanel = new javax.swing.JPanel();
         setForm = new javax.swing.JPanel();
-        setBuildFolderLabel = new javax.swing.JLabel();
-        setBuildLabel = new javax.swing.JLabel();
+        setFolderLabel = new javax.swing.JLabel();
+        setFolderField = new javax.swing.JTextField();
+        setBrowseButton = new javax.swing.JButton();
         setUrlLabel = new javax.swing.JLabel();
         setUrlField = new javax.swing.JTextField();
         setNameLabel = new javax.swing.JLabel();
@@ -385,23 +396,29 @@ public final class Publisher extends JFrame {
         setPanel.setLayout(new java.awt.BorderLayout());
         setForm.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 12, 4, 12));
         setForm.setLayout(new java.awt.GridBagLayout());
-        setBuildFolderLabel.setText("Build folder");
+        setFolderLabel.setText("Client folder");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
         gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
-        setForm.add(setBuildFolderLabel, gridBagConstraints);
+        setForm.add(setFolderLabel, gridBagConstraints);
 
-        setBuildLabel.setText(" ");
-        setBuildLabel.setForeground(new java.awt.Color(68, 68, 68));
+        setFolderField.setEditable(false);
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 1;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.weightx = 1.0;
         gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
-        setForm.add(setBuildLabel, gridBagConstraints);
+        setForm.add(setFolderField, gridBagConstraints);
+
+        setBrowseButton.setText("Browse...");
+        setBrowseButton.addActionListener(this::setBrowseButtonActionPerformed);
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 0;
+        setForm.add(setBrowseButton, gridBagConstraints);
 
         setUrlLabel.setText("Download URL");
         gridBagConstraints = new java.awt.GridBagConstraints();
@@ -497,7 +514,7 @@ public final class Publisher extends JFrame {
         setList.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 12, 4, 12));
         setList.setLayout(new java.awt.BorderLayout(0, 4));
         setHead.setLayout(new java.awt.BorderLayout());
-        setListLabel.setText("Files of the set");
+        setListLabel.setText("Files of the set (each is installed at the same place in the application folder)");
         setHead.add(setListLabel, java.awt.BorderLayout.WEST);
 
         setListButtons.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
@@ -589,10 +606,12 @@ public final class Publisher extends JFrame {
         include.setMaxWidth(60);
         include.setMinWidth(60);
         include.setCellRenderer(new CheckRenderer(table.getDefaultRenderer(Boolean.class)));
-        table.getColumnModel().getColumn(2).setMaxWidth(90);
-        table.getColumnModel().getColumn(3).setMaxWidth(70);
-        table.getColumnModel().getColumn(4).setPreferredWidth(220);
-        table.getColumnModel().getColumn(4).setCellRenderer(new NoteRenderer());
+        table.getColumnModel().getColumn(2).setPreferredWidth(90);
+        table.getColumnModel().getColumn(2).setMaxWidth(160);
+        table.getColumnModel().getColumn(3).setMaxWidth(90);
+        table.getColumnModel().getColumn(4).setMaxWidth(70);
+        table.getColumnModel().getColumn(5).setPreferredWidth(220);
+        table.getColumnModel().getColumn(5).setCellRenderer(new NoteRenderer());
     }
 
     private void browseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_browseButtonActionPerformed
@@ -611,23 +630,36 @@ public final class Publisher extends JFrame {
     }//GEN-LAST:event_browseButtonActionPerformed
 
     private void appCheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_appCheckAllActionPerformed
-        files.checkAll(appModel.side);
+        appFiles.checkAll();
     }//GEN-LAST:event_appCheckAllActionPerformed
 
     private void appUncheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_appUncheckAllActionPerformed
-        files.uncheckAll(appModel.side);
+        appFiles.uncheckAll();
     }//GEN-LAST:event_appUncheckAllActionPerformed
+
+    private void setBrowseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_setBrowseButtonActionPerformed
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Choose the client's folder (laid out like the application folder: lib, Forms, ...)");
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        Path start = setDir != null ? setDir : lastBuildDir;
+        if (start != null && Files.isDirectory(start)) {
+            fc.setCurrentDirectory(start.toFile());
+        }
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            setFolderChosen(fc.getSelectedFile().toPath());
+        }
+    }//GEN-LAST:event_setBrowseButtonActionPerformed
 
     private void setUrlFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_setUrlFieldFocusLost
         setUrlChanged(true);
     }//GEN-LAST:event_setUrlFieldFocusLost
 
     private void setCheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_setCheckAllActionPerformed
-        files.checkAll(setModel.side);
+        setFiles.checkAll();
     }//GEN-LAST:event_setCheckAllActionPerformed
 
     private void setUncheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_setUncheckAllActionPerformed
-        files.uncheckAll(setModel.side);
+        setFiles.uncheckAll();
     }//GEN-LAST:event_setUncheckAllActionPerformed
 
     private void openOutButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openOutButtonActionPerformed
@@ -678,9 +710,15 @@ public final class Publisher extends JFrame {
             boolean otherProject = previous == null
                     || !previous.toAbsolutePath().normalize().equals(dir.toAbsolutePath().normalize());
             lastBuildDir = dir;
-            files.setRows(ReleaseBuilder.scan(dir));
-            setBuildLabel.setText(dir.toAbsolutePath() + "   (same as Application)");
-            append("Scanned " + dir + ": " + files.size() + " files");
+            appScan = ReleaseBuilder.scan(dir);
+            if (otherProject) {
+                appFiles.clear();
+                setFiles.clear();
+                setDir = null;
+                setFolderField.setText("");
+            }
+            refreshAppFiles();
+            append("Scanned " + dir + ": " + appFiles.size() + " files");
 
             if (otherProject) {
                 appBaseField.setText("");
@@ -713,24 +751,14 @@ public final class Publisher extends JFrame {
                     appOutDir = savedOut;
                 }
                 for (String ex : ReleaseBuilder.readExcludes(config)) {
-                    files.setOwner(ex, NONE);
-                }
-                SetConfig sc = SetConfig.read(config);
-                if (sc.url != null) {
-                    setUrlField.setText(sc.url);
-                }
-                if (sc.name != null) {
-                    setNameField.setText(sc.name);
-                }
-                for (String f : sc.files) {
-                    files.setOwner(f, SET);
+                    appFiles.setTicked(ex, false);
                 }
                 append("Read settings from " + config);
             } else if (otherProject) {
                 append("No app.txt for this project yet: fill in the fields of both tabs.");
             }
             if (mainClassField.getText().trim().isEmpty()) {
-                for (ReleaseBuilder.Candidate c : files.rows()) {
+                for (ReleaseBuilder.Candidate c : appFiles.rows()) {
                     if (c.classpath && c.path.indexOf('/') < 0) {
                         String mc = ReleaseBuilder.mainClassOf(dir.resolve(c.path));
                         if (mc != null) {
@@ -747,6 +775,106 @@ public final class Publisher extends JFrame {
             setUrlChanged(true);
             appLastLabel.setText(lastSetupText(appOutDir));
             refreshFooter();
+            if (otherProject) {
+                List<String> clients = clientFolders();
+                if (clients.size() == 1) {
+                    setFolderChosen(dir.resolve(clients.get(0)));
+                }
+            }
+        } catch (IOException e) {
+            error("Could not read that folder", e);
+        }
+    }
+
+    /** The client folders inside the build folder (relative), each with its set.txt. */
+    private List<String> clientFolders() {
+        List<String> out = new ArrayList<String>();
+        for (ReleaseBuilder.Candidate c : appScan) {
+            if (c.clientFolder != null && !out.contains(c.clientFolder)) {
+                out.add(c.clientFolder);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Fills the Application tab from the last scan: client folders are left out, and so is
+     * every file a client folder also has (the client's set puts its own copy there).
+     */
+    private void refreshAppFiles() throws IOException {
+        String chosen = null;
+        if (setDir != null && lastBuildDir != null) {
+            Path build = lastBuildDir.toAbsolutePath().normalize();
+            Path set = setDir.toAbsolutePath().normalize();
+            if (set.startsWith(build) && !set.equals(build)) {
+                chosen = build.relativize(set).toString().replace('\\', '/');
+            }
+        }
+        List<ReleaseBuilder.Candidate> rows = new ArrayList<ReleaseBuilder.Candidate>();
+        for (ReleaseBuilder.Candidate c : appScan) {
+            if (c.clientFolder == null && (chosen == null || !c.path.startsWith(chosen + "/"))) {
+                rows.add(c);
+            }
+        }
+        Map<String, String> claimed = new HashMap<String, String>();
+        if (setDir != null) {
+            for (ReleaseBuilder.Candidate c : setFiles.rows()) {
+                if (!c.skipByDefault) {
+                    claimed.put(c.path, "left out: in client folder " + setDir.getFileName());
+                }
+            }
+        }
+        for (String folder : clientFolders()) {
+            for (ReleaseBuilder.Candidate c : ReleaseBuilder.scan(lastBuildDir.resolve(folder))) {
+                if (!c.skipByDefault && !claimed.containsKey(c.path)) {
+                    claimed.put(c.path, "left out: in client folder " + folder);
+                }
+            }
+        }
+        appFiles.setRows(rows);
+        appFiles.setClaimed(claimed);
+    }
+
+    /** Shows a client folder in the Set tab, with the settings in its set.txt. */
+    private void setFolderChosen(Path dir) {
+        if (lastBuildDir != null && lastBuildDir.toAbsolutePath().normalize().equals(dir.toAbsolutePath().normalize())) {
+            warn("That is the build folder. Choose the client's own folder, for example "
+                    + lastBuildDir.resolve("stg") + ".");
+            return;
+        }
+        try {
+            boolean other = setDir == null
+                    || !setDir.toAbsolutePath().normalize().equals(dir.toAbsolutePath().normalize());
+            setDir = dir;
+            setFolderField.setText(dir.toAbsolutePath().toString());
+            if (other) {
+                setFiles.clear();
+            }
+            setFiles.setRows(ReleaseBuilder.scan(dir));
+            if (other) {
+                SetConfig sc = SetConfig.read(dir.resolve(ReleaseBuilder.CLIENT_FOLDER_FILE));
+                if (sc == null && lastBuildDir != null) {
+                    // No set.txt yet: take the set lines an older publisher kept in app.txt,
+                    // if they were for this client.
+                    Path config = findConfig(lastBuildDir);
+                    SetConfig old = config == null ? null : SetConfig.readLegacy(config);
+                    if (old != null && clientOf(old.url).equalsIgnoreCase(dir.getFileName().toString())) {
+                        sc = old;
+                    }
+                }
+                setUrlField.setText(sc == null || sc.url == null ? "" : sc.url);
+                setNameField.setText(sc == null || sc.name == null ? "" : sc.name);
+                if (sc != null) {
+                    for (String ex : sc.exclude) {
+                        setFiles.setTicked(ex, false);
+                    }
+                }
+                setNotesArea.setText("");
+                setClientShown = "";
+            }
+            refreshAppFiles();
+            append("Client folder " + dir + ": " + setFiles.size() + " files");
+            setUrlChanged(true);
         } catch (IOException e) {
             error("Could not read that folder", e);
         }
@@ -821,10 +949,24 @@ public final class Publisher extends JFrame {
 
     private void createSetup(final int side) {
         final ReleaseBuilder.Options o = new ReleaseBuilder.Options();
-        o.buildDir = Paths.get(buildField.getText().trim());
         o.outDir = outDir(side);
-        o.exclude = new LinkedHashSet<String>(files.pathsNotOwnedBy(side));
         if (side == APP) {
+            o.buildDir = Paths.get(buildField.getText().trim());
+            // Scan again: a set build may have added a client folder's set.txt since.
+            try {
+                appScan = ReleaseBuilder.scan(o.buildDir);
+                refreshAppFiles();
+            } catch (IOException e) {
+                error("Could not read the build folder", e);
+                return;
+            }
+            // Everything scanned that the application does not publish: unticked files,
+            // files a client folder also has, and the client folders themselves.
+            o.exclude = new LinkedHashSet<String>();
+            for (ReleaseBuilder.Candidate c : appScan) {
+                o.exclude.add(c.path);
+            }
+            o.exclude.removeAll(appFiles.published());
             o.version = versionField.getText().trim();
             o.appBase = appBaseField.getText().trim();
             o.uiName = uiNameField.getText().trim();
@@ -837,6 +979,12 @@ public final class Publisher extends JFrame {
             o.oldLayout = Boolean.valueOf(oldLayoutBox.isSelected());
             addNotes(o, notesArea);
         } else {
+            if (setDir == null) {
+                warn("Choose the client's folder in the Set tab first.");
+                return;
+            }
+            o.buildDir = setDir;
+            o.exclude = new LinkedHashSet<String>(setFiles.notPublished());
             o.version = setVersionField.getText().trim();
             o.appBase = setUrlField.getText().trim();
             o.uiName = setNameField.getText().trim();
@@ -850,7 +998,7 @@ public final class Publisher extends JFrame {
                 return;
             }
         }
-        if (files.count(side) == 0) {
+        if (filesOf(side).count() == 0) {
             warn("No file is ticked in the " + sideName(side) + " tab.");
             return;
         }
@@ -889,7 +1037,8 @@ public final class Publisher extends JFrame {
         }
 
         final ReleaseBuilder.Options appForConfig = appOptionsForConfig();
-        final SetConfig setForConfig = currentSetConfig();
+        final SetConfig setForConfig = side == SET ? currentSetConfig() : null;
+        final Path setFolder = setDir;
         setBusy(true);
         append("");
         append("Building " + sideName(side) + " version " + o.version + " from " + o.buildDir);
@@ -927,7 +1076,12 @@ public final class Publisher extends JFrame {
                             o.outDir.getParent().resolve("client"), name);
                     publish("client folder: " + client);
                 }
-                for (Path f : saveProjectConfig(appForConfig, setForConfig)) {
+                for (Path f : saveProjectConfig(appForConfig)) {
+                    publish("saved settings to " + f);
+                }
+                if (setForConfig != null) {
+                    Path f = setFolder.resolve(ReleaseBuilder.CLIENT_FOLDER_FILE);
+                    Io.writeStringAtomic(f, setForConfig.toText());
                     publish("saved settings to " + f);
                 }
                 return r;
@@ -1045,9 +1199,9 @@ public final class Publisher extends JFrame {
                 a.jvmArgs.add(s);
             }
         }
-        // Everything the application release does not carry, set files included, so the
-        // command line (ManifestTool with this app.txt) builds the same release.
-        a.exclude = new LinkedHashSet<String>(files.pathsNotOwnedBy(APP));
+        // Every file of the Application tab it does not carry (client folders are left out
+        // by ManifestTool itself), so the command line builds the same release.
+        a.exclude = new LinkedHashSet<String>(appFiles.notPublished());
         return a;
     }
 
@@ -1055,15 +1209,16 @@ public final class Publisher extends JFrame {
         SetConfig s = new SetConfig();
         s.url = setUrlField.getText().trim();
         s.name = setNameField.getText().trim();
-        s.files.addAll(files.pathsWithOwner(SET));
+        s.exclude.addAll(setFiles.notPublished());
         return s;
     }
 
     /**
      * Writes the project's app.txt (in dist, and next to build.xml so it survives Clean and
-     * Build): the application's settings, its unticked files, and the set's address and files.
+     * Build): the application's settings and its unticked files. A set's settings are in its
+     * client folder (set.txt).
      */
-    private List<Path> saveProjectConfig(ReleaseBuilder.Options app, SetConfig set) throws IOException {
+    private List<Path> saveProjectConfig(ReleaseBuilder.Options app) throws IOException {
         List<Path> written = new ArrayList<Path>();
         List<Path> targets = new ArrayList<Path>();
         targets.add(app.buildDir.resolve(UpdateConfig.APP_TXT));
@@ -1076,40 +1231,65 @@ public final class Publisher extends JFrame {
         }
         for (Path f : targets) {
             ReleaseBuilder.saveConfig(app, f);
-            String text = Io.readString(f);
-            Io.writeStringAtomic(f, (text == null ? "" : text) + set.toText());
             written.add(f);
         }
         return written;
     }
 
-    /** The set tab's part of app.txt, as comment lines the application release ignores. */
+    /** A client folder's settings, in its set.txt (never published). */
     static final class SetConfig {
         String url;
         String name;
-        final List<String> files = new ArrayList<String>();
+        final List<String> exclude = new ArrayList<String>();
 
         String toText() {
-            StringBuilder sb = new StringBuilder("\n# Set (client plugin) published from this build"
-                    + " folder.\n");
+            StringBuilder sb = new StringBuilder();
+            sb.append("# This client's set, for the Release publisher (Set tab). Not published.\n");
+            sb.append("# Every other file here is installed at the same place in the application folder.\n");
             if (url != null && !url.isEmpty()) {
-                sb.append("# set.appbase = ").append(url).append('\n');
+                sb.append("appbase = ").append(url).append('\n');
             }
             if (name != null && !name.isEmpty()) {
-                sb.append("# set.name = ").append(name).append('\n');
+                sb.append("ui.name = ").append(name).append('\n');
             }
-            for (String f : files) {
-                sb.append("# set.file = ").append(f).append('\n');
+            for (String f : exclude) {
+                sb.append("exclude = ").append(f).append('\n');
             }
             return sb.toString();
         }
 
+        /** The settings in a set.txt, or null when there is none. */
         static SetConfig read(Path file) {
-            SetConfig c = new SetConfig();
             String text = Io.readString(file);
             if (text == null) {
-                return c;
+                return null;
             }
+            SetConfig c = new SetConfig();
+            for (String raw : text.split("\n")) {
+                String s = raw.trim();
+                if (s.startsWith("#") || s.indexOf('=') < 0) {
+                    continue;
+                }
+                String key = s.substring(0, s.indexOf('=')).trim();
+                String value = s.substring(s.indexOf('=') + 1).trim();
+                if ("appbase".equals(key)) {
+                    c.url = value;
+                } else if ("ui.name".equals(key)) {
+                    c.name = value;
+                } else if ("exclude".equals(key) && !value.isEmpty()) {
+                    c.exclude.add(value);
+                }
+            }
+            return c;
+        }
+
+        /** The "# set.appbase / # set.name" lines older publishers wrote into app.txt, or null. */
+        static SetConfig readLegacy(Path appTxt) {
+            String text = Io.readString(appTxt);
+            if (text == null) {
+                return null;
+            }
+            SetConfig c = new SetConfig();
             for (String raw : text.split("\n")) {
                 String s = raw.trim();
                 if (!s.startsWith("# set.") || s.indexOf('=') < 0) {
@@ -1121,11 +1301,9 @@ public final class Publisher extends JFrame {
                     c.url = value;
                 } else if ("name".equals(key)) {
                     c.name = value;
-                } else if ("file".equals(key) && !value.isEmpty()) {
-                    c.files.add(value);
                 }
             }
-            return c;
+            return c.url == null ? null : c;
         }
     }
 
@@ -1171,8 +1349,12 @@ public final class Publisher extends JFrame {
                 ? "Set" + (clientOf(setUrlField.getText()).isEmpty() ? ""
                         : " (" + clientOf(setUrlField.getText()) + ")")
                 : "Application";
-        int n = files.count(side);
-        summary.setText(label + ": " + n + " files, " + UpdateManager.humanBytes(files.bytes(side)));
+        summary.setText(label + ": " + filesOf(side).count() + " files, "
+                + UpdateManager.humanBytes(filesOf(side).bytes()));
+    }
+
+    private Files2 filesOf(int side) {
+        return side == SET ? setFiles : appFiles;
     }
 
     private void append(final String line) {
@@ -1236,12 +1418,17 @@ public final class Publisher extends JFrame {
         String b = buildField.getText().trim();
         if (!b.isEmpty() && Files.isDirectory(Paths.get(b))) {
             buildFolderChosen(Paths.get(b));
+            String sf = p.getProperty("setFolder", "");
+            if (!sf.isEmpty() && Files.isDirectory(Paths.get(sf))) {
+                setFolderChosen(Paths.get(sf));
+            }
         }
     }
 
     private void savePrefs() {
         Properties p = Io.loadProps(prefsFile()); // keeps the upload settings stored there
         p.setProperty("build", buildField.getText().trim());
+        p.setProperty("setFolder", setDir == null ? "" : setDir.toAbsolutePath().toString());
         p.setProperty("oldLayout", String.valueOf(oldLayoutBox.isSelected()));
         p.setProperty("clientFiles", String.valueOf(clientFilesBox.isSelected()));
         try {
@@ -1254,13 +1441,19 @@ public final class Publisher extends JFrame {
     // ------------------------------------------------------------------ the files
 
     /**
-     * Every file of the build folder and who it belongs to: the application, the set, or
-     * neither. Both tabs show this one list, so a file can never be in both releases.
+     * One tab's files: the scanned files, which are ticked, and which are left out because
+     * the other release carries them (a client folder's copy wins over the application's).
      */
     static final class Files2 {
+        final int side;
         private final List<ReleaseBuilder.Candidate> rows = new ArrayList<ReleaseBuilder.Candidate>();
-        private final List<Integer> owner = new ArrayList<Integer>();
+        private final List<Boolean> ticked = new ArrayList<Boolean>();
+        private Map<String, String> claimed = new HashMap<String, String>();
         private final List<Runnable> listeners = new ArrayList<Runnable>();
+
+        Files2(int side) {
+            this.side = side;
+        }
 
         void addListener(Runnable r) {
             listeners.add(r);
@@ -1272,13 +1465,32 @@ public final class Publisher extends JFrame {
             }
         }
 
-        void setRows(List<ReleaseBuilder.Candidate> list) {
+        void clear() {
             rows.clear();
-            owner.clear();
+            ticked.clear();
+            claimed = new HashMap<String, String>();
+            changed();
+        }
+
+        /** A new scan: files listed before keep their tick, new ones follow skipByDefault. */
+        void setRows(List<ReleaseBuilder.Candidate> list) {
+            Map<String, Boolean> before = new HashMap<String, Boolean>();
+            for (int i = 0; i < rows.size(); i++) {
+                before.put(rows.get(i).path, ticked.get(i));
+            }
+            rows.clear();
+            ticked.clear();
             for (ReleaseBuilder.Candidate c : list) {
                 rows.add(c);
-                owner.add(Integer.valueOf(c.skipByDefault ? NONE : APP));
+                Boolean b = before.get(c.path);
+                ticked.add(b != null ? b : Boolean.valueOf(!c.skipByDefault));
             }
+            changed();
+        }
+
+        /** Paths the other release carries, with the reason shown in the Note column. */
+        void setClaimed(Map<String, String> paths) {
+            claimed = paths;
             changed();
         }
 
@@ -1290,89 +1502,88 @@ public final class Publisher extends JFrame {
             return rows.size();
         }
 
-        int ownerAt(int i) {
-            return owner.get(i).intValue();
+        String claimedAt(int i) {
+            return claimed.get(rows.get(i).path);
         }
 
-        void setOwnerAt(int i, int who) {
-            owner.set(i, Integer.valueOf(who));
+        boolean publishedAt(int i) {
+            return ticked.get(i).booleanValue() && claimedAt(i) == null;
+        }
+
+        void setTickedAt(int i, boolean on) {
+            ticked.set(i, Boolean.valueOf(on));
             changed();
         }
 
-        void setOwner(String path, int who) {
+        void setTicked(String path, boolean on) {
             for (int i = 0; i < rows.size(); i++) {
                 if (rows.get(i).path.equals(path)) {
-                    owner.set(i, Integer.valueOf(who));
+                    ticked.set(i, Boolean.valueOf(on));
                 }
             }
             changed();
         }
 
-        /** Ticks every file the other side does not own (build junk stays as it is). */
-        void checkAll(int side) {
+        /** Ticks every file except build junk. */
+        void checkAll() {
             for (int i = 0; i < rows.size(); i++) {
-                if (ownerAt(i) == NONE && !rows.get(i).skipByDefault) {
-                    owner.set(i, Integer.valueOf(side));
+                if (!rows.get(i).skipByDefault) {
+                    ticked.set(i, Boolean.TRUE);
                 }
             }
             changed();
         }
 
-        /** Unticks every file of this side; they become free, not the other side's. */
-        void uncheckAll(int side) {
+        void uncheckAll() {
             for (int i = 0; i < rows.size(); i++) {
-                if (ownerAt(i) == side) {
-                    owner.set(i, Integer.valueOf(NONE));
-                }
+                ticked.set(i, Boolean.FALSE);
             }
             changed();
         }
 
-        List<String> pathsWithOwner(int who) {
+        List<String> published() {
             List<String> out = new ArrayList<String>();
             for (int i = 0; i < rows.size(); i++) {
-                if (ownerAt(i) == who) {
+                if (publishedAt(i)) {
                     out.add(rows.get(i).path);
                 }
             }
             return out;
         }
 
-        Set<String> pathsNotOwnedBy(int side) {
+        Set<String> notPublished() {
             Set<String> out = new LinkedHashSet<String>();
             for (int i = 0; i < rows.size(); i++) {
-                if (ownerAt(i) != side) {
+                if (!publishedAt(i)) {
                     out.add(rows.get(i).path);
                 }
             }
             return out;
         }
 
-        int count(int side) {
-            return pathsWithOwner(side).size();
+        int count() {
+            return published().size();
         }
 
-        long bytes(int side) {
+        long bytes() {
             long total = 0;
             for (int i = 0; i < rows.size(); i++) {
-                total += ownerAt(i) == side ? rows.get(i).size : 0;
+                total += publishedAt(i) ? rows.get(i).size : 0;
             }
             return total;
         }
     }
 
-    /** One tab's view of the shared file list. */
+    /** One tab's file list. */
     private static final class FileTableModel extends AbstractTableModel {
 
         private static final long serialVersionUID = 1L;
-        private static final String[] COLUMNS = {"Publish", "File", "Size", "Type", "Note"};
+        private static final String[] COLUMNS = {"Publish", "File", "Location", "Size", "Type", "Note"};
 
         final Files2 files;
-        final int side;
 
-        FileTableModel(Files2 files, int side) {
+        FileTableModel(Files2 files) {
             this.files = files;
-            this.side = side;
             files.addListener(new Runnable() {
                 @Override
                 public void run() {
@@ -1403,31 +1614,29 @@ public final class Publisher extends JFrame {
 
         @Override
         public boolean isCellEditable(int row, int column) {
-            int other = side == APP ? SET : APP;
-            return column == 0 && files.ownerAt(row) != other;
+            return column == 0 && files.claimedAt(row) == null;
         }
 
         @Override
         public Object getValueAt(int row, int column) {
             ReleaseBuilder.Candidate c = files.rows().get(row);
-            int who = files.ownerAt(row);
             switch (column) {
                 case 0:
-                    return Boolean.valueOf(who == side);
+                    return Boolean.valueOf(files.publishedAt(row));
                 case 1:
                     return c.path;
                 case 2:
-                    return UpdateManager.humanBytes(c.size);
+                    // where it is installed, relative to the application folder
+                    return c.path.indexOf('/') < 0 ? "(root)" : c.path.substring(0, c.path.lastIndexOf('/'));
                 case 3:
+                    return UpdateManager.humanBytes(c.size);
+                case 4:
                     return c.classpath ? "code" : "file";
                 default:
-                    if (side == APP && who == SET) {
-                        return "in Set tab";
+                    if (files.claimedAt(row) != null) {
+                        return files.claimedAt(row);
                     }
-                    if (side == SET && who == APP) {
-                        return "in Application tab";
-                    }
-                    if (side == SET && who == SET && !c.classpath) {
+                    if (files.side == SET && files.publishedAt(row) && !c.classpath) {
                         return "customer copy kept";
                     }
                     return c.note == null ? "" : c.note;
@@ -1437,12 +1646,12 @@ public final class Publisher extends JFrame {
         @Override
         public void setValueAt(Object value, int row, int column) {
             if (column == 0 && isCellEditable(row, column)) {
-                files.setOwnerAt(row, Boolean.TRUE.equals(value) ? side : NONE);
+                files.setTickedAt(row, Boolean.TRUE.equals(value));
             }
         }
     }
 
-    /** The tick box, greyed out for a file the other tab owns. */
+    /** The tick box, greyed out for a file the other release carries. */
     private static final class CheckRenderer implements TableCellRenderer {
         private final TableCellRenderer base;
 
@@ -1470,7 +1679,7 @@ public final class Publisher extends JFrame {
             Component c = super.getTableCellRendererComponent(t, value, selected, focused, row, column);
             String v = value == null ? "" : value.toString();
             if (!selected) {
-                if (v.startsWith("in ")) {
+                if (v.startsWith("left out")) {
                     c.setForeground(new Color(0x88, 0x88, 0x88));
                 } else if (v.isEmpty() || v.startsWith("customer")) {
                     c.setForeground(v.isEmpty() ? t.getForeground() : new Color(0x2E, 0x6B, 0x30));
@@ -1537,9 +1746,10 @@ public final class Publisher extends JFrame {
     private javax.swing.JButton optionsButton;
     private javax.swing.JProgressBar progress;
     private javax.swing.JPanel progressPanel;
-    private javax.swing.JLabel setBuildFolderLabel;
-    private javax.swing.JLabel setBuildLabel;
+    private javax.swing.JButton setBrowseButton;
     private javax.swing.JButton setCheckAll;
+    private javax.swing.JTextField setFolderField;
+    private javax.swing.JLabel setFolderLabel;
     private javax.swing.JPanel setForm;
     private javax.swing.JPanel setHead;
     private javax.swing.JLabel setLastLabel;

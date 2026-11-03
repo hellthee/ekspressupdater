@@ -139,38 +139,55 @@ PluginUpdate.ensure("set", setUrlFromDatabase, mainFrame, source);
 
 ## 4. Publishing a client's set
 
-The set is published from the **same build folder** as the application, in the publisher's
-**Set** tab:
+Each client has a **client folder**, laid out like the application folder: everything in it
+is installed at the same place on that client's PCs.
 
-1. Build the application with that client's set (so `dist\lib\set.jar` is theirs).
-2. **Set** tab:
+```
+gas-x\                    build folder (Application tab)
+  GasX.exe  GasX.jar  lib\ ...
+  stg\                    client folder of STG (Set tab)
+    set.txt               the publisher's settings for this client (never published)
+    lib\Set.jar           -> lib\Set.jar
+    Forms\rptInvoice.jasper -> Forms\rptInvoice.jasper
+    kop.png  stamp.png    -> application folder
+    properties-gasx.prp   -> application folder
+```
+
+1. Put the client's files into its folder (NetBeans or IntelliJ builds the jars; copy them in).
+2. **Set** tab, **Client folder → Browse...**: choose the folder. The list shows each file with its
+   **Location** (`(root)`, `lib`, `Forms`, ...). To install a file somewhere else, move it inside
+   the client folder.
 
 | Field | PT ABC example |
 |---|---|
 | Download URL | `http://172.104.47.59:8080/apps/gasx/sets/pt-abc/` |
 | Set name | `GasX set PT ABC` |
 | Version | suggested from `upload-set\pt-abc` (last setup of this client) |
-| Files | tick `lib/set.jar` and any supporting files: `config.dat`, images, `.prp` |
+| Files | everything in the client folder is ticked; untick what must not go out |
 
-3. **Create setup**, then **Upload** (server folder `…/apps/gasx/sets/pt-abc`). The log shows
-   the address for the client's database (`set_url`).
+3. **Create setup**, then **Upload** (server folder `…/apps/gasx/sets/pt-abc`).
 
 Rules:
-- **One file, one release.** A file ticked in **Set** can't be ticked in **Application**;
-  there it shows "in Set tab". The application release never carries a set file.
-- **Same paths on the PC.** `lib/set.jar` goes to `lib\set.jar`, `config.dat` to the
-  application folder, `images/logo.png` to `images\`.
+- **A client folder is never part of the application release.** The Application tab leaves out
+  every folder holding a `set.txt` (and the one chosen in the Set tab), and `ManifestTool` does the
+  same.
+- **The client's copy wins.** A file in the build folder that a client folder also has (an old
+  `lib/Set.jar`, `kop.png`) is left out of the application release; the Application tab shows
+  "left out: in client folder stg".
 - **Customer copies of non-jar files are kept.** A `config.dat` or `.prp` the customer
   changed is replaced only when you change that file in a new set release. Jars are always
   exactly as released.
-- **Check all / Uncheck all** act on one tab only. Check all never takes a file the other tab
-  has.
 - Output: `upload` for the application, `upload-set\<client>` for each client's set (the last
-  part of the set's Download URL).
+  part of the set's Download URL), and `client-set\<client>\setapp.txt` for new PCs.
 - Every PC of that client gets the new set at its next start. No database change, no restart.
 
-The settings of both tabs are saved in the project's `app.txt` (in `dist` and next to
-`build.xml`; commit it to Git). The set's part is stored as `# set.…` lines.
+The application's settings are saved in the project's `app.txt`; each client's in its folder's
+`set.txt` (Download URL, set name, unticked files). Choosing a client folder without a `set.txt`
+takes the Download URL from the `# set.…` lines older publishers kept in `app.txt`, when it is
+for that client.
+
+**Executables.** Every `.exe` in the build folder (`GasX.exe`) is ticked like any other file, so a
+new one is never forgotten. Only `launcher.exe` and `launcher.jar` stay out.
 
 ## 5. What happens
 
