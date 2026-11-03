@@ -157,7 +157,7 @@ First run downloads everything. Afterwards the folder looks like this:
 C:\Apps\Saint\
   Saint.jar  lib\...   ← the application, exactly like dist
   app.txt  logs\
-  .update\             ← hidden: downloads in progress, old files during an update
+  .update\             ← the updater's record: downloads in progress, old files during an update
 ```
 
 ### Ant target

@@ -155,6 +155,34 @@ public final class InstallStore {
         }
     }
 
+    /**
+     * Files of the installed release that are missing, and jars whose size is wrong: a
+     * quick check for every start (sizes only, no checksums). A settings file that exists
+     * is the customer's own business; plugin files are the plugin updater's.
+     */
+    public List<String> missingFiles() {
+        List<String> out = new ArrayList<String>();
+        UpdateManifest m = installed();
+        if (m == null) {
+            return out;
+        }
+        m = m.without(PluginSet.managedPaths(appDir));
+        for (UpdateManifest.FileEntry e : m.entries().values()) {
+            if (isSeed(e)) {
+                continue; // put back from defaults by restoreMissingSettings()
+            }
+            try {
+                Path f = file(e.path);
+                if (!Files.isRegularFile(f) || e.classpath && Files.size(f) != e.size) {
+                    out.add(e.path);
+                }
+            } catch (IOException | IllegalArgumentException bad) {
+                out.add(e.path);
+            }
+        }
+        return out;
+    }
+
     /** What an update does with one file of the new release. */
     public enum Plan {
         /** The file on this PC is already exactly the new one. */
@@ -676,11 +704,12 @@ public final class InstallStore {
             }
         }
         Files.createDirectories(updateDir());
-        // A leading dot hides a folder on Linux and macOS but not on Windows.
+        // Visible on Windows (earlier versions hid it): someone clearing the folder by hand
+        // sees it and removes it too, instead of leaving a record of files that are gone.
         try {
-            Files.setAttribute(updateDir(), "dos:hidden", Boolean.TRUE);
+            Files.setAttribute(updateDir(), "dos:hidden", Boolean.FALSE);
         } catch (Exception ignored) {
-            // not a Windows file system; the dot already does the job
+            // not a Windows file system
         }
         final FileChannel channel = FileChannel.open(key,
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE);
