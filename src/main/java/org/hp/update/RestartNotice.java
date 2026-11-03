@@ -1,24 +1,9 @@
 package org.hp.update;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Window;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.JDialog;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.WindowConstants;
 
 /**
  * Asks a user who has the application open to restart for a new release.
@@ -31,87 +16,128 @@ final class RestartNotice extends JDialog {
 
     private static final long serialVersionUID = 1L;
 
-    private RestartNotice(Window owner, UpdateConfig cfg, UpdateManifest remote,
-            final Runnable restart, final Runnable dismissed) {
-        super(owner, cfg.displayName() + " update", ModalityType.MODELESS);
-        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+    private final Runnable restart;
+    private final Runnable dismissed;
 
-        JLabel headline = new JLabel(cfg.displayName() + " " + remote.version()
-                + (cfg.mandatory() ? " is required" : " is available"));
-        headline.setFont(headline.getFont().deriveFont(Font.BOLD, headline.getFont().getSize2D() + 2f));
-        JLabel line = new JLabel(cfg.mandatory()
-                ? "Save your work, then restart to install it."
-                : "Restart when convenient to install it.");
+    private RestartNotice(Window owner, UpdateConfig cfg, UpdateManifest remote,
+            Runnable restart, Runnable dismissed) {
+        super(owner, cfg.displayName() + " update", ModalityType.MODELESS);
+        this.restart = restart;
+        this.dismissed = dismissed;
+        initComponents();
+
+        // Text from the server is shown as text, never as HTML.
         headline.putClientProperty("html.disable", Boolean.TRUE);
         line.putClientProperty("html.disable", Boolean.TRUE);
-        line.setForeground(new Color(0x44, 0x44, 0x44));
+        headline.setText(cfg.displayName() + " " + remote.version()
+                + (cfg.mandatory() ? " is required" : " is available"));
+        headline.setFont(headline.getFont().deriveFont(Font.BOLD, headline.getFont().getSize2D() + 2f));
+        line.setText(cfg.mandatory()
+                ? "Save your work, then restart to install it."
+                : "Restart when convenient to install it.");
 
-        JPanel top = new JPanel();
-        top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-        top.setBorder(BorderFactory.createEmptyBorder(14, 16, 8, 16));
-        headline.setAlignmentX(LEFT_ALIGNMENT);
-        line.setAlignmentX(LEFT_ALIGNMENT);
-        top.add(headline);
-        top.add(Box.createVerticalStrut(6));
-        top.add(line);
-
-        JPanel center = new JPanel(new BorderLayout());
-        center.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 16));
-        if (!remote.notes().isEmpty()) {
+        if (remote.notes().isEmpty()) {
+            center.remove(notesScroll);
+        } else {
             StringBuilder sb = new StringBuilder();
             for (String n : remote.notes()) {
                 sb.append(n).append('\n');
             }
-            JTextArea notes = new JTextArea(sb.toString().trim());
-            notes.setEditable(false);
-            notes.setLineWrap(true);
-            notes.setWrapStyleWord(true);
+            notes.setText(sb.toString().trim());
             notes.setRows(Math.min(6, remote.notes().size() + 1));
             notes.setBackground(getBackground());
-            JScrollPane sp = new JScrollPane(notes);
-            sp.setBorder(BorderFactory.createTitledBorder("What's new"));
-            center.add(sp, BorderLayout.CENTER);
         }
 
-        JButton later = new JButton("Later");
-        JButton now = new JButton("Restart now");
-        JPanel buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.setBorder(BorderFactory.createEmptyBorder(10, 16, 12, 16));
-        buttons.add(Box.createHorizontalGlue());
-        buttons.add(later);
-        buttons.add(Box.createHorizontalStrut(8));
-        buttons.add(now);
-
-        now.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dispose();
-                restart.run();
-            }
-        });
-        later.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dispose();
-            }
-        });
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosed(WindowEvent e) {
-                dismissed.run();
-            }
-        });
-
-        setLayout(new BorderLayout());
-        add(top, BorderLayout.NORTH);
-        add(center, BorderLayout.CENTER);
-        add(buttons, BorderLayout.SOUTH);
         pack();
         setSize(new Dimension(Math.max(420, getWidth()), getHeight()));
         setLocationRelativeTo(owner);
         getRootPane().setDefaultButton(now);
     }
+
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
+        top = new javax.swing.JPanel();
+        headline = new javax.swing.JLabel();
+        filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 6), new java.awt.Dimension(0, 6), new java.awt.Dimension(32767, 6));
+        line = new javax.swing.JLabel();
+        center = new javax.swing.JPanel();
+        notesScroll = new javax.swing.JScrollPane();
+        notes = new javax.swing.JTextArea();
+        buttons = new javax.swing.JPanel();
+        filler2 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        later = new javax.swing.JButton();
+        filler3 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
+        now = new javax.swing.JButton();
+
+        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            public void windowClosed(java.awt.event.WindowEvent evt) {
+                formWindowClosed(evt);
+            }
+        });
+        getContentPane().setLayout(new java.awt.BorderLayout());
+        top.setBorder(javax.swing.BorderFactory.createEmptyBorder(14, 16, 8, 16));
+        top.setLayout(new javax.swing.BoxLayout(top, javax.swing.BoxLayout.Y_AXIS));
+        headline.setText("Application 1.0 is required");
+        headline.setAlignmentX(0.0F);
+        top.add(headline);
+
+        top.add(filler1);
+
+        line.setText("Save your work, then restart to install it.");
+        line.setAlignmentX(0.0F);
+        line.setForeground(new java.awt.Color(68, 68, 68));
+        top.add(line);
+
+        getContentPane().add(top, java.awt.BorderLayout.NORTH);
+
+        center.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 16, 0, 16));
+        center.setLayout(new java.awt.BorderLayout());
+        notesScroll.setBorder(javax.swing.BorderFactory.createTitledBorder("What's new"));
+        notes.setEditable(false);
+        notes.setLineWrap(true);
+        notes.setWrapStyleWord(true);
+        notesScroll.setViewportView(notes);
+
+        center.add(notesScroll, java.awt.BorderLayout.CENTER);
+
+        getContentPane().add(center, java.awt.BorderLayout.CENTER);
+
+        buttons.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 16, 12, 16));
+        buttons.setLayout(new javax.swing.BoxLayout(buttons, javax.swing.BoxLayout.X_AXIS));
+        buttons.add(filler2);
+
+        later.setText("Later");
+        later.addActionListener(this::laterActionPerformed);
+        buttons.add(later);
+
+        buttons.add(filler3);
+
+        now.setText("Restart now");
+        now.addActionListener(this::nowActionPerformed);
+        buttons.add(now);
+
+        getContentPane().add(buttons, java.awt.BorderLayout.SOUTH);
+    }// </editor-fold>//GEN-END:initComponents
+
+    private void nowActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nowActionPerformed
+        dispose();
+        restart.run();
+    }//GEN-LAST:event_nowActionPerformed
+
+    private void laterActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_laterActionPerformed
+        dispose();
+    }//GEN-LAST:event_laterActionPerformed
+
+    private void formWindowClosed(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosed
+        dismissed.run();
+    }//GEN-LAST:event_formWindowClosed
 
     static void show(Window owner, UpdateConfig cfg, UpdateManifest remote,
             Runnable restart, Runnable dismissed) {
@@ -119,4 +145,19 @@ final class RestartNotice extends JDialog {
         n.setVisible(true);
         n.toFront();
     }
+
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JPanel buttons;
+    private javax.swing.JPanel center;
+    private javax.swing.Box.Filler filler1;
+    private javax.swing.Box.Filler filler2;
+    private javax.swing.Box.Filler filler3;
+    private javax.swing.JLabel headline;
+    private javax.swing.JButton later;
+    private javax.swing.JLabel line;
+    private javax.swing.JTextArea notes;
+    private javax.swing.JScrollPane notesScroll;
+    private javax.swing.JButton now;
+    private javax.swing.JPanel top;
+    // End of variables declaration//GEN-END:variables
 }

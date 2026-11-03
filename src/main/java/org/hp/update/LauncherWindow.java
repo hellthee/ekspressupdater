@@ -1,28 +1,13 @@
 package org.hp.update;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.concurrent.CountDownLatch;
-import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JProgressBar;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
-import javax.swing.WindowConstants;
 
 /**
  * The window shown while the application starts.
@@ -39,17 +24,6 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
 
     private static final long serialVersionUID = 1L;
 
-    private final JLabel title = new JLabel();
-    private final JLabel stage = new JLabel("Please wait...");
-    private final JProgressBar bar = new JProgressBar(0, 1000);
-    private final JTextArea details = new JTextArea();
-    private final JScrollPane detailScroll = new JScrollPane(details);
-    private final JButton detailsButton = new JButton("Details");
-    private final JButton skipButton = new JButton("Skip and start now");
-    private final JButton copyButton = new JButton("Copy details");
-    private final JButton logButton = new JButton("Open log folder");
-    private final JButton closeButton = new JButton("Close");
-    private final JButton retryButton = new JButton("Retry");
     private final java.util.concurrent.SynchronousQueue<Boolean> choice =
             new java.util.concurrent.SynchronousQueue<Boolean>();
     private volatile boolean asking;
@@ -65,129 +39,181 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
     private LauncherWindow(UpdateConfig cfg) {
         super(cfg.displayName());
         this.cfg = cfg;
-        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        initComponents();
 
         // Text from the server or the application is shown as text, never as HTML.
         title.putClientProperty("html.disable", Boolean.TRUE);
         stage.putClientProperty("html.disable", Boolean.TRUE);
         title.setText(cfg.displayName());
         title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 4f));
-        stage.setForeground(new Color(0x44, 0x44, 0x44));
-        bar.setStringPainted(true);
-        bar.setIndeterminate(true);
-        bar.setString(" ");
-
-        details.setEditable(false);
-        details.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
-        details.setLineWrap(true);
-        details.setWrapStyleWord(true);
         detailScroll.setVisible(false);
-
-        JPanel top = new JPanel();
-        top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-        top.setBorder(BorderFactory.createEmptyBorder(14, 16, 10, 16));
-        title.setAlignmentX(LEFT_ALIGNMENT);
-        stage.setAlignmentX(LEFT_ALIGNMENT);
-        bar.setAlignmentX(LEFT_ALIGNMENT);
-        bar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
-        top.add(title);
-        top.add(Box.createVerticalStrut(6));
-        top.add(stage);
-        top.add(Box.createVerticalStrut(10));
-        top.add(bar);
-
-        JPanel center = new JPanel(new BorderLayout());
-        center.setBorder(BorderFactory.createEmptyBorder(0, 16, 0, 16));
-        center.add(detailScroll, BorderLayout.CENTER);
-
-        JPanel buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.setBorder(BorderFactory.createEmptyBorder(10, 16, 12, 16));
-        buttons.add(detailsButton);
-        buttons.add(Box.createHorizontalStrut(8));
-        buttons.add(skipButton);
-        buttons.add(Box.createHorizontalStrut(8));
-        buttons.add(copyButton);
-        buttons.add(Box.createHorizontalStrut(8));
-        buttons.add(logButton);
-        buttons.add(Box.createHorizontalGlue());
-        buttons.add(retryButton);
-        buttons.add(Box.createHorizontalStrut(8));
-        buttons.add(closeButton);
         retryButton.setVisible(false);
         skipButton.setVisible(false);
         copyButton.setVisible(false);
         logButton.setVisible(false);
 
-        detailsButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                showDetails(!detailScroll.isVisible());
-            }
-        });
-        skipButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                skipButton.setEnabled(false);
-                stage.setText("Skipping the update, starting the installed version...");
-                Runnable r = skipAction;
-                if (r != null) {
-                    new Thread(r, "skip-update").start();
-                }
-            }
-        });
-        copyButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Toolkit.getDefaultToolkit().getSystemClipboard()
-                        .setContents(new StringSelection(details.getText()), null);
-                copyButton.setText("Copied");
-            }
-        });
-        logButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                try {
-                    java.awt.Desktop.getDesktop().open(
-                            Relauncher.appLog(LauncherWindow.this.cfg).getParent().toFile());
-                } catch (Exception ignored) {
-                    // not every desktop can open a folder for us
-                }
-            }
-        });
-        closeButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (asking) {
-                    answer(false);
-                }
-                dismiss();
-            }
-        });
-        retryButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                answer(true);
-            }
-        });
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                if (asking) {
-                    answer(false);
-                }
-                dismiss();
-            }
-        });
-
-        setLayout(new BorderLayout());
-        add(top, BorderLayout.NORTH);
-        add(center, BorderLayout.CENTER);
-        add(buttons, BorderLayout.SOUTH);
         setPreferredSize(SMALL);
         pack();
         setLocationRelativeTo(null);
     }
+
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
+        top = new javax.swing.JPanel();
+        title = new javax.swing.JLabel();
+        filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 6), new java.awt.Dimension(0, 6), new java.awt.Dimension(32767, 6));
+        stage = new javax.swing.JLabel();
+        filler2 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 10), new java.awt.Dimension(0, 10), new java.awt.Dimension(32767, 10));
+        bar = new javax.swing.JProgressBar();
+        center = new javax.swing.JPanel();
+        detailScroll = new javax.swing.JScrollPane();
+        details = new javax.swing.JTextArea();
+        buttons = new javax.swing.JPanel();
+        detailsButton = new javax.swing.JButton();
+        filler3 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
+        skipButton = new javax.swing.JButton();
+        filler4 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
+        copyButton = new javax.swing.JButton();
+        filler5 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
+        logButton = new javax.swing.JButton();
+        filler6 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        retryButton = new javax.swing.JButton();
+        filler7 = new javax.swing.Box.Filler(new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 0), new java.awt.Dimension(8, 32767));
+        closeButton = new javax.swing.JButton();
+
+        setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            public void windowClosing(java.awt.event.WindowEvent evt) {
+                formWindowClosing(evt);
+            }
+        });
+        getContentPane().setLayout(new java.awt.BorderLayout());
+        top.setBorder(javax.swing.BorderFactory.createEmptyBorder(14, 16, 10, 16));
+        top.setLayout(new javax.swing.BoxLayout(top, javax.swing.BoxLayout.Y_AXIS));
+        title.setText("Application");
+        title.setAlignmentX(0.0F);
+        top.add(title);
+
+        top.add(filler1);
+
+        stage.setText("Please wait...");
+        stage.setAlignmentX(0.0F);
+        stage.setForeground(new java.awt.Color(68, 68, 68));
+        top.add(stage);
+
+        top.add(filler2);
+
+        bar.setMaximum(1000);
+        bar.setAlignmentX(0.0F);
+        bar.setIndeterminate(true);
+        bar.setMaximumSize(new java.awt.Dimension(2147483647, 20));
+        bar.setString(" ");
+        bar.setStringPainted(true);
+        top.add(bar);
+
+        getContentPane().add(top, java.awt.BorderLayout.NORTH);
+
+        center.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 16, 0, 16));
+        center.setLayout(new java.awt.BorderLayout());
+        details.setEditable(false);
+        details.setFont(new java.awt.Font("Monospaced", 0, 11));
+        details.setLineWrap(true);
+        details.setWrapStyleWord(true);
+        detailScroll.setViewportView(details);
+
+        center.add(detailScroll, java.awt.BorderLayout.CENTER);
+
+        getContentPane().add(center, java.awt.BorderLayout.CENTER);
+
+        buttons.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 16, 12, 16));
+        buttons.setLayout(new javax.swing.BoxLayout(buttons, javax.swing.BoxLayout.X_AXIS));
+        detailsButton.setText("Details");
+        detailsButton.addActionListener(this::detailsButtonActionPerformed);
+        buttons.add(detailsButton);
+
+        buttons.add(filler3);
+
+        skipButton.setText("Skip and start now");
+        skipButton.addActionListener(this::skipButtonActionPerformed);
+        buttons.add(skipButton);
+
+        buttons.add(filler4);
+
+        copyButton.setText("Copy details");
+        copyButton.addActionListener(this::copyButtonActionPerformed);
+        buttons.add(copyButton);
+
+        buttons.add(filler5);
+
+        logButton.setText("Open log folder");
+        logButton.addActionListener(this::logButtonActionPerformed);
+        buttons.add(logButton);
+
+        buttons.add(filler6);
+
+        retryButton.setText("Retry");
+        retryButton.addActionListener(this::retryButtonActionPerformed);
+        buttons.add(retryButton);
+
+        buttons.add(filler7);
+
+        closeButton.setText("Close");
+        closeButton.addActionListener(this::closeButtonActionPerformed);
+        buttons.add(closeButton);
+
+        getContentPane().add(buttons, java.awt.BorderLayout.SOUTH);
+    }// </editor-fold>//GEN-END:initComponents
+
+    private void detailsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_detailsButtonActionPerformed
+        showDetails(!detailScroll.isVisible());
+    }//GEN-LAST:event_detailsButtonActionPerformed
+
+    private void skipButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_skipButtonActionPerformed
+        skipButton.setEnabled(false);
+        stage.setText("Skipping the update, starting the installed version...");
+        Runnable r = skipAction;
+        if (r != null) {
+            new Thread(r, "skip-update").start();
+        }
+    }//GEN-LAST:event_skipButtonActionPerformed
+
+    private void copyButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_copyButtonActionPerformed
+        Toolkit.getDefaultToolkit().getSystemClipboard()
+                .setContents(new StringSelection(details.getText()), null);
+        copyButton.setText("Copied");
+    }//GEN-LAST:event_copyButtonActionPerformed
+
+    private void logButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_logButtonActionPerformed
+        try {
+            java.awt.Desktop.getDesktop().open(Relauncher.appLog(cfg).getParent().toFile());
+        } catch (Exception ignored) {
+            // not every desktop can open a folder for us
+        }
+    }//GEN-LAST:event_logButtonActionPerformed
+
+    private void retryButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_retryButtonActionPerformed
+        answer(true);
+    }//GEN-LAST:event_retryButtonActionPerformed
+
+    private void closeButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeButtonActionPerformed
+        if (asking) {
+            answer(false);
+        }
+        dismiss();
+    }//GEN-LAST:event_closeButtonActionPerformed
+
+    private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
+        if (asking) {
+            answer(false);
+        }
+        dismiss();
+    }//GEN-LAST:event_formWindowClosing
 
     public static LauncherWindow show(final UpdateConfig cfg) {
         final LauncherWindow[] holder = new LauncherWindow[1];
@@ -507,4 +533,28 @@ public final class LauncherWindow extends JFrame implements LauncherUi {
             SwingUtilities.invokeLater(r);
         }
     }
+
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JProgressBar bar;
+    private javax.swing.JPanel buttons;
+    private javax.swing.JPanel center;
+    private javax.swing.JButton closeButton;
+    private javax.swing.JButton copyButton;
+    private javax.swing.JTextArea details;
+    private javax.swing.JButton detailsButton;
+    private javax.swing.JScrollPane detailScroll;
+    private javax.swing.Box.Filler filler1;
+    private javax.swing.Box.Filler filler2;
+    private javax.swing.Box.Filler filler3;
+    private javax.swing.Box.Filler filler4;
+    private javax.swing.Box.Filler filler5;
+    private javax.swing.Box.Filler filler6;
+    private javax.swing.Box.Filler filler7;
+    private javax.swing.JButton logButton;
+    private javax.swing.JButton retryButton;
+    private javax.swing.JButton skipButton;
+    private javax.swing.JLabel stage;
+    private javax.swing.JLabel title;
+    private javax.swing.JPanel top;
+    // End of variables declaration//GEN-END:variables
 }

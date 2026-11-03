@@ -1,18 +1,9 @@
 package org.hp.publish;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,28 +14,20 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
-import javax.swing.WindowConstants;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.AbstractTableModel;
@@ -82,38 +65,12 @@ public final class Publisher extends JFrame {
     static final int APP = 1;
     static final int SET = 2;
 
-    // shared
-    private final JTextField buildField = new JTextField();
     private final Files2 files = new Files2();
-    private final JTabbedPane tabs = new JTabbedPane();
-    private final JTextArea log = new JTextArea();
-    private final JProgressBar progress = new JProgressBar();
-    private final JLabel summary = new JLabel(" ");
-    private final JButton createButton = new JButton("Create setup");
-    private final JButton openOutButton = new JButton("Open output folder");
-    private final JButton uploadButton = new JButton("Upload...");
-    private final JButton optionsButton = new JButton("Options...");
+    private final FileTableModel appModel = new FileTableModel(files, APP);
+    private final FileTableModel setModel = new FileTableModel(files, SET);
+    /** Shown in Options... (not part of the window). */
     private final JCheckBox clientFilesBox = new JCheckBox("Also create a client folder", true);
     private final JCheckBox oldLayoutBox = new JCheckBox("Copies for older updaters", false);
-
-    // application tab
-    private final JTextField appBaseField = new JTextField();
-    private final JTextField uiNameField = new JTextField();
-    private final JTextField mainClassField = new JTextField();
-    private final JTextField jvmArgsField = new JTextField();
-    private final JTextField versionField = new JTextField(10);
-    private final JLabel appLastLabel = new JLabel(" ");
-    private final JTextArea notesArea = new JTextArea(2, 40);
-    private final FileTableModel appModel = new FileTableModel(files, APP);
-
-    // set tab
-    private final JLabel setBuildLabel = new JLabel(" ");
-    private final JTextField setUrlField = new JTextField();
-    private final JTextField setNameField = new JTextField();
-    private final JTextField setVersionField = new JTextField(10);
-    private final JLabel setLastLabel = new JLabel(" ");
-    private final JTextArea setNotesArea = new JTextArea(2, 40);
-    private final FileTableModel setModel = new FileTableModel(files, SET);
 
     /** The build folder the fields belong to. */
     private Path lastBuildDir;
@@ -123,59 +80,12 @@ public final class Publisher extends JFrame {
     private String setClientShown = "";
 
     public Publisher() {
-        super("Release publisher");
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
+        initComponents();
 
-        tabs.addTab("Application", appTab());
-        tabs.addTab("Set", setTab());
-        tabs.addChangeListener(new javax.swing.event.ChangeListener() {
-            @Override
-            public void stateChanged(javax.swing.event.ChangeEvent e) {
-                refreshFooter();
-            }
-        });
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tabs, logPanel());
-        split.setResizeWeight(0.8);
-        split.setBorder(null);
-        add(split, BorderLayout.CENTER);
-        add(footer(), BorderLayout.SOUTH);
-
-        loadPrefs();
-        setPreferredSize(new Dimension(900, 760));
-        pack();
-        setLocationRelativeTo(null);
-    }
-
-    // -------------------------------------------------------------------- layout
-
-    private JComponent appTab() {
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setBorder(BorderFactory.createEmptyBorder(10, 12, 4, 12));
-        int row = 0;
-        addRow(form, row++, "Build folder", buildField, browseButton());
-        addRow(form, row++, "Download URL", appBaseField, null);
-        addRow(form, row++, "App name", uiNameField, null);
-        addRow(form, row++, "Main class", mainClassField, null);
-        addRow(form, row++, "JVM options", jvmArgsField, null);
-        addRow(form, row++, "Version", versionRow(versionField, appLastLabel), null);
-        addRow(form, row++, "What's new", notesScroll(notesArea), null);
-        return tabPanel(form, "Files of the application", appModel);
-    }
-
-    private JComponent setTab() {
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setBorder(BorderFactory.createEmptyBorder(10, 12, 4, 12));
-        int row = 0;
-        setBuildLabel.setForeground(new Color(0x44, 0x44, 0x44));
-        addRow(form, row++, "Build folder", setBuildLabel, null);
-        setUrlField.setToolTipText("<html>The client's own set folder on the server, e.g."
-                + "<br>http://172.104.47.59:8080/apps/gasx/sets/pt-abc/"
-                + "<br>Put the same address into that client's database (set_url).</html>");
-        addRow(form, row++, "Download URL", setUrlField, null);
-        addRow(form, row++, "Set name", setNameField, null);
-        addRow(form, row++, "Version", versionRow(setVersionField, setLastLabel), null);
-        addRow(form, row++, "What's new", notesScroll(setNotesArea), null);
+        versionField.setMaximumSize(new Dimension(120, versionField.getPreferredSize().height));
+        setVersionField.setMaximumSize(new Dimension(120, setVersionField.getPreferredSize().height));
+        configureTable(appTable);
+        configureTable(setTable);
         setUrlField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -192,38 +102,486 @@ public final class Publisher extends JFrame {
                 setUrlChanged(false);
             }
         });
-        setUrlField.addFocusListener(new FocusAdapter() {
+        // Added here, not in the form: adding the tabs would call it before the window is complete.
+        tabs.addChangeListener(new javax.swing.event.ChangeListener() {
             @Override
-            public void focusLost(FocusEvent e) {
-                setUrlChanged(true);
+            public void stateChanged(javax.swing.event.ChangeEvent e) {
+                refreshFooter();
             }
         });
-        return tabPanel(form, "Files of the set", setModel);
+        files.addListener(new Runnable() {
+            @Override
+            public void run() {
+                refreshFooter();
+            }
+        });
+
+        loadPrefs();
+        pack();
+        setLocationRelativeTo(null);
     }
 
-    private JComponent versionRow(JTextField field, JLabel last) {
-        JPanel p = new JPanel();
-        p.setLayout(new BoxLayout(p, BoxLayout.X_AXIS));
-        field.setMaximumSize(new Dimension(120, field.getPreferredSize().height));
-        p.add(field);
-        p.add(Box.createHorizontalStrut(12));
-        last.setForeground(new Color(0x55, 0x55, 0x55));
-        p.add(last);
-        p.add(Box.createHorizontalGlue());
-        return p;
-    }
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
+        java.awt.GridBagConstraints gridBagConstraints;
 
-    private static JScrollPane notesScroll(JTextArea area) {
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-        JScrollPane s = new JScrollPane(area);
-        s.setPreferredSize(new Dimension(200, 44));
-        return s;
-    }
+        split = new javax.swing.JSplitPane();
+        tabs = new javax.swing.JTabbedPane();
+        appPanel = new javax.swing.JPanel();
+        appForm = new javax.swing.JPanel();
+        appBuildLabel = new javax.swing.JLabel();
+        buildField = new javax.swing.JTextField();
+        browseButton = new javax.swing.JButton();
+        appBaseLabel = new javax.swing.JLabel();
+        appBaseField = new javax.swing.JTextField();
+        uiNameLabel = new javax.swing.JLabel();
+        uiNameField = new javax.swing.JTextField();
+        mainClassLabel = new javax.swing.JLabel();
+        mainClassField = new javax.swing.JTextField();
+        jvmArgsLabel = new javax.swing.JLabel();
+        jvmArgsField = new javax.swing.JTextField();
+        versionLabel = new javax.swing.JLabel();
+        appVersionPanel = new javax.swing.JPanel();
+        versionField = new javax.swing.JTextField();
+        appVersionGap = new javax.swing.Box.Filler(new java.awt.Dimension(12, 0), new java.awt.Dimension(12, 0), new java.awt.Dimension(12, 32767));
+        appLastLabel = new javax.swing.JLabel();
+        appVersionGlue = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        notesLabel = new javax.swing.JLabel();
+        notesScroll = new javax.swing.JScrollPane();
+        notesArea = new javax.swing.JTextArea();
+        appList = new javax.swing.JPanel();
+        appHead = new javax.swing.JPanel();
+        appListLabel = new javax.swing.JLabel();
+        appListButtons = new javax.swing.JPanel();
+        appCheckAll = new javax.swing.JButton();
+        appUncheckAll = new javax.swing.JButton();
+        appTableScroll = new javax.swing.JScrollPane();
+        appTable = new javax.swing.JTable(appModel);
+        setPanel = new javax.swing.JPanel();
+        setForm = new javax.swing.JPanel();
+        setBuildFolderLabel = new javax.swing.JLabel();
+        setBuildLabel = new javax.swing.JLabel();
+        setUrlLabel = new javax.swing.JLabel();
+        setUrlField = new javax.swing.JTextField();
+        setNameLabel = new javax.swing.JLabel();
+        setNameField = new javax.swing.JTextField();
+        setVersionLabel = new javax.swing.JLabel();
+        setVersionPanel = new javax.swing.JPanel();
+        setVersionField = new javax.swing.JTextField();
+        setVersionGap = new javax.swing.Box.Filler(new java.awt.Dimension(12, 0), new java.awt.Dimension(12, 0), new java.awt.Dimension(12, 32767));
+        setLastLabel = new javax.swing.JLabel();
+        setVersionGlue = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        setNotesLabel = new javax.swing.JLabel();
+        setNotesScroll = new javax.swing.JScrollPane();
+        setNotesArea = new javax.swing.JTextArea();
+        setList = new javax.swing.JPanel();
+        setHead = new javax.swing.JPanel();
+        setListLabel = new javax.swing.JLabel();
+        setListButtons = new javax.swing.JPanel();
+        setCheckAll = new javax.swing.JButton();
+        setUncheckAll = new javax.swing.JButton();
+        setTableScroll = new javax.swing.JScrollPane();
+        setTable = new javax.swing.JTable(setModel);
+        logPanel = new javax.swing.JPanel();
+        logScroll = new javax.swing.JScrollPane();
+        log = new javax.swing.JTextArea();
+        south = new javax.swing.JPanel();
+        progressPanel = new javax.swing.JPanel();
+        progress = new javax.swing.JProgressBar();
+        buttons = new javax.swing.JPanel();
+        summary = new javax.swing.JLabel();
+        buttonsGlue = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        openOutButton = new javax.swing.JButton();
+        buttonsGap1 = new javax.swing.Box.Filler(new java.awt.Dimension(6, 0), new java.awt.Dimension(6, 0), new java.awt.Dimension(6, 32767));
+        optionsButton = new javax.swing.JButton();
+        buttonsGap2 = new javax.swing.Box.Filler(new java.awt.Dimension(6, 0), new java.awt.Dimension(6, 0), new java.awt.Dimension(6, 32767));
+        createButton = new javax.swing.JButton();
+        buttonsGap3 = new javax.swing.Box.Filler(new java.awt.Dimension(6, 0), new java.awt.Dimension(6, 0), new java.awt.Dimension(6, 32767));
+        uploadButton = new javax.swing.JButton();
 
-    /** Form on top, file list with Check all / Uncheck all below. */
-    private JComponent tabPanel(JComponent form, String title, final FileTableModel model) {
-        JTable table = new JTable(model);
+        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setTitle("Release publisher");
+        setPreferredSize(new java.awt.Dimension(900, 760));
+        getContentPane().setLayout(new java.awt.BorderLayout());
+        split.setBorder(null);
+        split.setOrientation(javax.swing.JSplitPane.VERTICAL_SPLIT);
+        split.setResizeWeight(0.8);
+        appPanel.setLayout(new java.awt.BorderLayout());
+        appForm.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 12, 4, 12));
+        appForm.setLayout(new java.awt.GridBagLayout());
+        appBuildLabel.setText("Build folder");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        appForm.add(appBuildLabel, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        appForm.add(buildField, gridBagConstraints);
+
+        browseButton.setText("Browse...");
+        browseButton.addActionListener(this::browseButtonActionPerformed);
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 0;
+        appForm.add(browseButton, gridBagConstraints);
+
+        appBaseLabel.setText("Download URL");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        appForm.add(appBaseLabel, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        appForm.add(appBaseField, gridBagConstraints);
+
+        uiNameLabel.setText("App name");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        appForm.add(uiNameLabel, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 2;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        appForm.add(uiNameField, gridBagConstraints);
+
+        mainClassLabel.setText("Main class");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 3;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        appForm.add(mainClassLabel, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 3;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        appForm.add(mainClassField, gridBagConstraints);
+
+        jvmArgsLabel.setText("JVM options");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 4;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        appForm.add(jvmArgsLabel, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 4;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        appForm.add(jvmArgsField, gridBagConstraints);
+
+        versionLabel.setText("Version");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 5;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        appForm.add(versionLabel, gridBagConstraints);
+
+        appVersionPanel.setLayout(new javax.swing.BoxLayout(appVersionPanel, javax.swing.BoxLayout.X_AXIS));
+        versionField.setColumns(10);
+        appVersionPanel.add(versionField);
+
+        appVersionPanel.add(appVersionGap);
+
+        appLastLabel.setText(" ");
+        appLastLabel.setForeground(new java.awt.Color(85, 85, 85));
+        appVersionPanel.add(appLastLabel);
+
+        appVersionPanel.add(appVersionGlue);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 5;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        appForm.add(appVersionPanel, gridBagConstraints);
+
+        notesLabel.setText("What's new");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 6;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        appForm.add(notesLabel, gridBagConstraints);
+
+        notesScroll.setPreferredSize(new java.awt.Dimension(200, 44));
+        notesArea.setColumns(40);
+        notesArea.setLineWrap(true);
+        notesArea.setRows(2);
+        notesArea.setWrapStyleWord(true);
+        notesScroll.setViewportView(notesArea);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 6;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        appForm.add(notesScroll, gridBagConstraints);
+
+        appPanel.add(appForm, java.awt.BorderLayout.NORTH);
+
+        appList.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        appList.setLayout(new java.awt.BorderLayout(0, 4));
+        appHead.setLayout(new java.awt.BorderLayout());
+        appListLabel.setText("Files of the application");
+        appHead.add(appListLabel, java.awt.BorderLayout.WEST);
+
+        appListButtons.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+        appCheckAll.setText("Check all");
+        appCheckAll.addActionListener(this::appCheckAllActionPerformed);
+        appListButtons.add(appCheckAll);
+
+        appUncheckAll.setText("Uncheck all");
+        appUncheckAll.addActionListener(this::appUncheckAllActionPerformed);
+        appListButtons.add(appUncheckAll);
+
+        appHead.add(appListButtons, java.awt.BorderLayout.EAST);
+
+        appList.add(appHead, java.awt.BorderLayout.NORTH);
+
+        appTableScroll.setViewportView(appTable);
+
+        appList.add(appTableScroll, java.awt.BorderLayout.CENTER);
+
+        appPanel.add(appList, java.awt.BorderLayout.CENTER);
+
+        tabs.addTab("Application", appPanel);
+
+        setPanel.setLayout(new java.awt.BorderLayout());
+        setForm.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 12, 4, 12));
+        setForm.setLayout(new java.awt.GridBagLayout());
+        setBuildFolderLabel.setText("Build folder");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        setForm.add(setBuildFolderLabel, gridBagConstraints);
+
+        setBuildLabel.setText(" ");
+        setBuildLabel.setForeground(new java.awt.Color(68, 68, 68));
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        setForm.add(setBuildLabel, gridBagConstraints);
+
+        setUrlLabel.setText("Download URL");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        setForm.add(setUrlLabel, gridBagConstraints);
+
+        setUrlField.setToolTipText("<html>The client's own set folder on the server, e.g.<br>http://172.104.47.59:8080/apps/gasx/sets/pt-abc/<br>Put the same address into that client's database (set_url).</html>");
+        setUrlField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                setUrlFieldFocusLost(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        setForm.add(setUrlField, gridBagConstraints);
+
+        setNameLabel.setText("Set name");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 2;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        setForm.add(setNameLabel, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 2;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        setForm.add(setNameField, gridBagConstraints);
+
+        setVersionLabel.setText("Version");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 3;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        setForm.add(setVersionLabel, gridBagConstraints);
+
+        setVersionPanel.setLayout(new javax.swing.BoxLayout(setVersionPanel, javax.swing.BoxLayout.X_AXIS));
+        setVersionField.setColumns(10);
+        setVersionPanel.add(setVersionField);
+
+        setVersionPanel.add(setVersionGap);
+
+        setLastLabel.setText(" ");
+        setLastLabel.setForeground(new java.awt.Color(85, 85, 85));
+        setVersionPanel.add(setLastLabel);
+
+        setVersionPanel.add(setVersionGlue);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 3;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        setForm.add(setVersionPanel, gridBagConstraints);
+
+        setNotesLabel.setText("What's new");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 4;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 8);
+        setForm.add(setNotesLabel, gridBagConstraints);
+
+        setNotesScroll.setPreferredSize(new java.awt.Dimension(200, 44));
+        setNotesArea.setColumns(40);
+        setNotesArea.setLineWrap(true);
+        setNotesArea.setRows(2);
+        setNotesArea.setWrapStyleWord(true);
+        setNotesScroll.setViewportView(setNotesArea);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 4;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 3, 6);
+        setForm.add(setNotesScroll, gridBagConstraints);
+
+        setPanel.add(setForm, java.awt.BorderLayout.NORTH);
+
+        setList.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        setList.setLayout(new java.awt.BorderLayout(0, 4));
+        setHead.setLayout(new java.awt.BorderLayout());
+        setListLabel.setText("Files of the set");
+        setHead.add(setListLabel, java.awt.BorderLayout.WEST);
+
+        setListButtons.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 6, 0));
+        setCheckAll.setText("Check all");
+        setCheckAll.addActionListener(this::setCheckAllActionPerformed);
+        setListButtons.add(setCheckAll);
+
+        setUncheckAll.setText("Uncheck all");
+        setUncheckAll.addActionListener(this::setUncheckAllActionPerformed);
+        setListButtons.add(setUncheckAll);
+
+        setHead.add(setListButtons, java.awt.BorderLayout.EAST);
+
+        setList.add(setHead, java.awt.BorderLayout.NORTH);
+
+        setTableScroll.setViewportView(setTable);
+
+        setList.add(setTableScroll, java.awt.BorderLayout.CENTER);
+
+        setPanel.add(setList, java.awt.BorderLayout.CENTER);
+
+        tabs.addTab("Set", setPanel);
+
+        split.setTopComponent(tabs);
+
+        logPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 12, 0, 12));
+        logPanel.setLayout(new java.awt.BorderLayout());
+        log.setEditable(false);
+        log.setLineWrap(true);
+        log.setRows(6);
+        log.setWrapStyleWord(true);
+        logScroll.setViewportView(log);
+
+        logPanel.add(logScroll, java.awt.BorderLayout.CENTER);
+
+        split.setBottomComponent(logPanel);
+
+        getContentPane().add(split, java.awt.BorderLayout.CENTER);
+
+        south.setLayout(new java.awt.BorderLayout());
+        progressPanel.setBorder(javax.swing.BorderFactory.createEmptyBorder(6, 12, 0, 12));
+        progressPanel.setLayout(new java.awt.BorderLayout());
+        progress.setString(" ");
+        progress.setStringPainted(true);
+        progressPanel.add(progress, java.awt.BorderLayout.CENTER);
+
+        south.add(progressPanel, java.awt.BorderLayout.NORTH);
+
+        buttons.setBorder(javax.swing.BorderFactory.createEmptyBorder(8, 12, 12, 12));
+        buttons.setLayout(new javax.swing.BoxLayout(buttons, javax.swing.BoxLayout.X_AXIS));
+        summary.setText(" ");
+        buttons.add(summary);
+
+        buttons.add(buttonsGlue);
+
+        openOutButton.setText("Open output folder");
+        openOutButton.addActionListener(this::openOutButtonActionPerformed);
+        buttons.add(openOutButton);
+
+        buttons.add(buttonsGap1);
+
+        optionsButton.setText("Options...");
+        optionsButton.addActionListener(this::optionsButtonActionPerformed);
+        buttons.add(optionsButton);
+
+        buttons.add(buttonsGap2);
+
+        createButton.setText("Create setup");
+        createButton.addActionListener(this::createButtonActionPerformed);
+        buttons.add(createButton);
+
+        buttons.add(buttonsGap3);
+
+        uploadButton.setText("Upload...");
+        uploadButton.addActionListener(this::uploadButtonActionPerformed);
+        buttons.add(uploadButton);
+
+        south.add(buttons, java.awt.BorderLayout.SOUTH);
+
+        getContentPane().add(south, java.awt.BorderLayout.SOUTH);
+    }// </editor-fold>//GEN-END:initComponents
+
+    /** The file list of a tab: check box column, note column. */
+    private static void configureTable(JTable table) {
         table.setRowHeight(22);
         table.setFillsViewportHeight(true);
         table.getTableHeader().setReorderingAllowed(false);
@@ -235,151 +593,61 @@ public final class Publisher extends JFrame {
         table.getColumnModel().getColumn(3).setMaxWidth(70);
         table.getColumnModel().getColumn(4).setPreferredWidth(220);
         table.getColumnModel().getColumn(4).setCellRenderer(new NoteRenderer());
-
-        JButton all = new JButton("Check all");
-        all.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                files.checkAll(model.side);
-            }
-        });
-        JButton none = new JButton("Uncheck all");
-        none.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                files.uncheckAll(model.side);
-            }
-        });
-        JPanel head = new JPanel(new BorderLayout());
-        head.add(new JLabel(title), BorderLayout.WEST);
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        buttons.add(all);
-        buttons.add(none);
-        head.add(buttons, BorderLayout.EAST);
-
-        JPanel list = new JPanel(new BorderLayout(0, 4));
-        list.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
-        list.add(head, BorderLayout.NORTH);
-        list.add(new JScrollPane(table), BorderLayout.CENTER);
-
-        JPanel p = new JPanel(new BorderLayout());
-        p.add(form, BorderLayout.NORTH);
-        p.add(list, BorderLayout.CENTER);
-        return p;
     }
 
-    private JComponent logPanel() {
-        log.setEditable(false);
-        log.setRows(6);
-        log.setLineWrap(true);
-        log.setWrapStyleWord(true);
-        JPanel p = new JPanel(new BorderLayout());
-        p.setBorder(BorderFactory.createEmptyBorder(4, 12, 0, 12));
-        p.add(new JScrollPane(log), BorderLayout.CENTER);
-        return p;
-    }
-
-    private JComponent footer() {
-        progress.setStringPainted(true);
-        progress.setString(" ");
-        openOutButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                openFolder(outDir(currentSide()));
-            }
-        });
-        optionsButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                showOptions();
-            }
-        });
-        uploadButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                Path out = outDir(currentSide());
-                if (out != null) {
-                    UploadDialog.open(Publisher.this, out, prefsFile());
-                }
-            }
-        });
-        createButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                createSetup(currentSide());
-            }
-        });
-        JPanel buttons = new JPanel();
-        buttons.setLayout(new BoxLayout(buttons, BoxLayout.X_AXIS));
-        buttons.setBorder(BorderFactory.createEmptyBorder(8, 12, 12, 12));
-        buttons.add(summary);
-        buttons.add(Box.createHorizontalGlue());
-        buttons.add(openOutButton);
-        buttons.add(Box.createHorizontalStrut(6));
-        buttons.add(optionsButton);
-        buttons.add(Box.createHorizontalStrut(6));
-        buttons.add(createButton);
-        buttons.add(Box.createHorizontalStrut(6));
-        buttons.add(uploadButton);
-
-        JPanel south = new JPanel(new BorderLayout());
-        JPanel p = new JPanel(new BorderLayout());
-        p.setBorder(BorderFactory.createEmptyBorder(6, 12, 0, 12));
-        p.add(progress, BorderLayout.CENTER);
-        south.add(p, BorderLayout.NORTH);
-        south.add(buttons, BorderLayout.SOUTH);
-        files.addListener(new Runnable() {
-            @Override
-            public void run() {
-                refreshFooter();
-            }
-        });
-        return south;
-    }
-
-    private void addRow(JPanel form, int row, String label, JComponent field, JComponent trailing) {
-        GridBagConstraints lc = new GridBagConstraints();
-        lc.gridx = 0;
-        lc.gridy = row;
-        lc.anchor = GridBagConstraints.EAST;
-        lc.insets = new Insets(3, 0, 3, 8);
-        form.add(new JLabel(label), lc);
-        GridBagConstraints fc = new GridBagConstraints();
-        fc.gridx = 1;
-        fc.gridy = row;
-        fc.weightx = 1;
-        fc.fill = GridBagConstraints.HORIZONTAL;
-        fc.insets = new Insets(3, 0, 3, 6);
-        form.add(field, fc);
-        if (trailing != null) {
-            GridBagConstraints tc = new GridBagConstraints();
-            tc.gridx = 2;
-            tc.gridy = row;
-            form.add(trailing, tc);
+    private void browseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_browseButtonActionPerformed
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Choose the folder holding your application jar (usually dist)");
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        String current = buildField.getText().trim();
+        if (!current.isEmpty()) {
+            File f = new File(current);
+            fc.setCurrentDirectory(f.isDirectory() ? f : f.getParentFile());
         }
-    }
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            buildField.setText(fc.getSelectedFile().getAbsolutePath());
+            buildFolderChosen(fc.getSelectedFile().toPath());
+        }
+    }//GEN-LAST:event_browseButtonActionPerformed
 
-    private JButton browseButton() {
-        JButton b = new JButton("Browse...");
-        b.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fc = new JFileChooser();
-                fc.setDialogTitle("Choose the folder holding your application jar (usually dist)");
-                fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-                String current = buildField.getText().trim();
-                if (!current.isEmpty()) {
-                    File f = new File(current);
-                    fc.setCurrentDirectory(f.isDirectory() ? f : f.getParentFile());
-                }
-                if (fc.showOpenDialog(Publisher.this) == JFileChooser.APPROVE_OPTION) {
-                    buildField.setText(fc.getSelectedFile().getAbsolutePath());
-                    buildFolderChosen(fc.getSelectedFile().toPath());
-                }
-            }
-        });
-        return b;
-    }
+    private void appCheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_appCheckAllActionPerformed
+        files.checkAll(appModel.side);
+    }//GEN-LAST:event_appCheckAllActionPerformed
+
+    private void appUncheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_appUncheckAllActionPerformed
+        files.uncheckAll(appModel.side);
+    }//GEN-LAST:event_appUncheckAllActionPerformed
+
+    private void setUrlFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_setUrlFieldFocusLost
+        setUrlChanged(true);
+    }//GEN-LAST:event_setUrlFieldFocusLost
+
+    private void setCheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_setCheckAllActionPerformed
+        files.checkAll(setModel.side);
+    }//GEN-LAST:event_setCheckAllActionPerformed
+
+    private void setUncheckAllActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_setUncheckAllActionPerformed
+        files.uncheckAll(setModel.side);
+    }//GEN-LAST:event_setUncheckAllActionPerformed
+
+    private void openOutButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openOutButtonActionPerformed
+        openFolder(outDir(currentSide()));
+    }//GEN-LAST:event_openOutButtonActionPerformed
+
+    private void optionsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_optionsButtonActionPerformed
+        showOptions();
+    }//GEN-LAST:event_optionsButtonActionPerformed
+
+    private void createButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_createButtonActionPerformed
+        createSetup(currentSide());
+    }//GEN-LAST:event_createButtonActionPerformed
+
+    private void uploadButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_uploadButtonActionPerformed
+        Path out = outDir(currentSide());
+        if (out != null) {
+            UploadDialog.open(this, out, prefsFile());
+        }
+    }//GEN-LAST:event_uploadButtonActionPerformed
 
     private void showOptions() {
         JPanel p = new JPanel();
@@ -1228,4 +1496,80 @@ public final class Publisher extends JFrame {
             }
         });
     }
+
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JTextField appBaseField;
+    private javax.swing.JLabel appBaseLabel;
+    private javax.swing.JLabel appBuildLabel;
+    private javax.swing.JButton appCheckAll;
+    private javax.swing.JPanel appForm;
+    private javax.swing.JPanel appHead;
+    private javax.swing.JLabel appLastLabel;
+    private javax.swing.JPanel appList;
+    private javax.swing.JPanel appListButtons;
+    private javax.swing.JLabel appListLabel;
+    private javax.swing.JPanel appPanel;
+    private javax.swing.JTable appTable;
+    private javax.swing.JScrollPane appTableScroll;
+    private javax.swing.JButton appUncheckAll;
+    private javax.swing.Box.Filler appVersionGap;
+    private javax.swing.Box.Filler appVersionGlue;
+    private javax.swing.JPanel appVersionPanel;
+    private javax.swing.JButton browseButton;
+    private javax.swing.JTextField buildField;
+    private javax.swing.JPanel buttons;
+    private javax.swing.Box.Filler buttonsGap1;
+    private javax.swing.Box.Filler buttonsGap2;
+    private javax.swing.Box.Filler buttonsGap3;
+    private javax.swing.Box.Filler buttonsGlue;
+    private javax.swing.JButton createButton;
+    private javax.swing.JTextField jvmArgsField;
+    private javax.swing.JLabel jvmArgsLabel;
+    private javax.swing.JTextArea log;
+    private javax.swing.JPanel logPanel;
+    private javax.swing.JScrollPane logScroll;
+    private javax.swing.JTextField mainClassField;
+    private javax.swing.JLabel mainClassLabel;
+    private javax.swing.JTextArea notesArea;
+    private javax.swing.JLabel notesLabel;
+    private javax.swing.JScrollPane notesScroll;
+    private javax.swing.JButton openOutButton;
+    private javax.swing.JButton optionsButton;
+    private javax.swing.JProgressBar progress;
+    private javax.swing.JPanel progressPanel;
+    private javax.swing.JLabel setBuildFolderLabel;
+    private javax.swing.JLabel setBuildLabel;
+    private javax.swing.JButton setCheckAll;
+    private javax.swing.JPanel setForm;
+    private javax.swing.JPanel setHead;
+    private javax.swing.JLabel setLastLabel;
+    private javax.swing.JPanel setList;
+    private javax.swing.JPanel setListButtons;
+    private javax.swing.JLabel setListLabel;
+    private javax.swing.JTextField setNameField;
+    private javax.swing.JLabel setNameLabel;
+    private javax.swing.JTextArea setNotesArea;
+    private javax.swing.JLabel setNotesLabel;
+    private javax.swing.JScrollPane setNotesScroll;
+    private javax.swing.JPanel setPanel;
+    private javax.swing.JTable setTable;
+    private javax.swing.JScrollPane setTableScroll;
+    private javax.swing.JButton setUncheckAll;
+    private javax.swing.JTextField setUrlField;
+    private javax.swing.JLabel setUrlLabel;
+    private javax.swing.JTextField setVersionField;
+    private javax.swing.Box.Filler setVersionGap;
+    private javax.swing.Box.Filler setVersionGlue;
+    private javax.swing.JLabel setVersionLabel;
+    private javax.swing.JPanel setVersionPanel;
+    private javax.swing.JPanel south;
+    private javax.swing.JSplitPane split;
+    private javax.swing.JLabel summary;
+    private javax.swing.JTabbedPane tabs;
+    private javax.swing.JTextField uiNameField;
+    private javax.swing.JLabel uiNameLabel;
+    private javax.swing.JButton uploadButton;
+    private javax.swing.JTextField versionField;
+    private javax.swing.JLabel versionLabel;
+    // End of variables declaration//GEN-END:variables
 }
