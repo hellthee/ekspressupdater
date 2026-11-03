@@ -79,7 +79,7 @@ The application lives flat in its own folder, exactly like `dist`, and runs from
 C:\Apps\GasX\
   GasX.jar  lib\...  properties-gasx.prp     the application
   launcher.jar  app.txt  logs\
-  .update\                                   hidden
+  .update\                                   the updater's record (deleting it is harmless)
     installed.txt        what is installed: version, files, checksums
     staging\1.4.3\       a download in progress, or finished and waiting
     cache\               partial downloads, resumed next time

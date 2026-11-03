@@ -263,7 +263,16 @@ public final class Bootstrap {
 
         if (repair) {
             store.clearFailed();
+        }
+        // Files deleted or damaged since they were installed (sizes only, so it is quick):
+        // downloaded again before the application starts, without waiting for --repair.
+        List<String> missing = store.missingFiles();
+        if (repair || !missing.isEmpty()) {
             ui.stage("Repairing installation");
+            if (!missing.isEmpty()) {
+                ui.detail("Missing or damaged: " + missing);
+                log("repairing, missing or damaged: " + missing);
+            }
             ui.detail(String.valueOf(mgr.repair()));
         }
         return launch(cfg, store, ui, gui, appArgs);

@@ -174,6 +174,12 @@ public final class SelfUpdate {
         if (store.hasJournal()) {
             return "an update was interrupted or has not been confirmed";
         }
+        List<String> missing = store.missingFiles();
+        if (!missing.isEmpty()) {
+            return "files of version " + store.installedVersion() + " are missing or damaged: "
+                    + (missing.size() <= 3 ? missing.toString() : missing.subList(0, 3) + " and "
+                    + (missing.size() - 3) + " more");
+        }
         UpdateManifest staged = store.stagedRelease();
         if (staged != null && !staged.version().equals(store.installedVersion())) {
             return "update " + staged.version() + " is downloaded and waiting";
