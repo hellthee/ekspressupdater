@@ -54,6 +54,16 @@ public interface LauncherUi {
     }
 
     /** What to do if the user closes the window while work is still going on. */
+    /**
+     * Shows that the application could not start, with a Repair button: true when the user
+     * clicks it (every file is then checked and what is damaged downloaded again). Without
+     * a window there is no button, so the way to do it is printed.
+     */
+    default boolean askRepair(String headline, String detail) {
+        failed(headline, detail + "\n\nTo repair the installation, start again with --repair.");
+        return false;
+    }
+
     default void onUserClose(Runnable action) {
     }
 
