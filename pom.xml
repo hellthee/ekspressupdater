@@ -9,7 +9,11 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>25</maven.compiler.release>
+        <!-- what NetBeans "Run" starts -->
         <exec.mainClass>org.hp.update.Bootstrap</exec.mainClass>
+        <!-- main class of each jar -->
+        <launcher.mainClass>org.hp.update.Bootstrap</launcher.mainClass>
+        <publisher.mainClass>org.hp.publish.Publisher</publisher.mainClass>
     </properties>
     
     <dependencies>
@@ -24,20 +28,31 @@
 
     <build>
         <plugins>
-            <!-- Maven Assembly Plugin builds the fat JAR -->
+            <!-- EkspressUpdater-1.0.jar: the launcher (no JSch needed) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>${launcher.mainClass}</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <!-- EkspressUpdater-1.0-jar-with-dependencies.jar: the publisher, JSch inside -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.8.0</version>
                 <configuration>
                     <descriptorRefs>
-                        <!-- Tells Maven to pack the jsch dependency inside the JAR -->
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <!-- Reads your main class from the properties above -->
-                            <mainClass>${exec.mainClass}</mainClass>
+                            <mainClass>${publisher.mainClass}</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
